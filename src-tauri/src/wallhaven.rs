@@ -56,11 +56,15 @@ pub async fn fetch_search(
     let client = build_client()?;
     let page_str = page.unwrap_or(1).to_string();
     let purity = settings.purity.clone();
+    let atleast = settings.atleast.clone();
     let mut req = client.get("https://wallhaven.cc/api/v1/search").query(&[
         ("sorting", sorting.as_str()),
         ("purity", purity.as_str()),
         ("page", page_str.as_str()),
     ]);
+    if !atleast.is_empty() {
+        req = req.query(&[("atleast", atleast.as_str())]);
+    }
 
     let api_key = settings.api_key.trim().to_string();
     if !api_key.is_empty() {
@@ -74,13 +78,15 @@ pub async fn fetch_search(
 
     // If unauthorized (bad API key), retry without it
     let text = if response.status() == 401 && !api_key.is_empty() {
-        client
-            .get("https://wallhaven.cc/api/v1/search")
-            .query(&[
-                ("sorting", sorting.as_str()),
-                ("purity", "100"),
-                ("page", page_str.as_str()),
-            ])
+        let mut retry = client.get("https://wallhaven.cc/api/v1/search").query(&[
+            ("sorting", sorting.as_str()),
+            ("purity", "100"),
+            ("page", page_str.as_str()),
+        ]);
+        if !atleast.is_empty() {
+            retry = retry.query(&[("atleast", atleast.as_str())]);
+        }
+        retry
             .send()
             .await
             .map_err(|e| format!("request failed: {e}"))?

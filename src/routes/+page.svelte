@@ -224,7 +224,7 @@
                         disabled={settingWallpaper !== ""}
                     >
                         <img src={wp.thumbs.small} alt={wp.id} />
-                        <span class="res">{wp.resolution}</span>
+
                         {#if settingWallpaper === wp.id}
                             <span class="applying">...</span>
                         {/if}
@@ -363,14 +363,5 @@
         color: #fff;
         font-size: 14px;
         font-weight: bold;
-    }
-
-    .res {
-        position: absolute;
-        bottom: 2px;
-        right: 4px;
-        font-size: 10px;
-        color: #fff;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
     }
 </style>

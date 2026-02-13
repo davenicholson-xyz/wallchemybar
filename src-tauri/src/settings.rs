@@ -8,6 +8,8 @@ pub struct Settings {
     pub api_key: String,
     #[serde(default = "default_purity")]
     pub purity: String,
+    #[serde(default)]
+    pub atleast: String,
 }
 
 fn default_purity() -> String {
@@ -20,6 +22,7 @@ impl Default for Settings {
             username: String::new(),
             api_key: String::new(),
             purity: default_purity(),
+            atleast: String::new(),
         }
     }
 }
