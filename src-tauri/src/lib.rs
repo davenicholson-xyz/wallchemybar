@@ -1,3 +1,4 @@
+mod history;
 mod settings;
 mod setwallpaper;
 mod wallhaven;
@@ -18,7 +19,9 @@ pub fn run() {
             wallhaven::fetch_search,
             wallhaven::fetch_collections,
             wallhaven::fetch_collection_wallpapers,
-            wallhaven::set_wallpaper
+            wallhaven::set_wallpaper,
+            history::get_history,
+            history::clear_history
         ])
         .setup(|app| {
             let icon = app

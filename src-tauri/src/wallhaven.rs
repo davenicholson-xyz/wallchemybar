@@ -4,7 +4,7 @@ use tauri::Manager;
 
 use crate::settings::load_settings;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Wallpaper {
     pub id: String,
     pub url: String,
@@ -13,7 +13,7 @@ pub struct Wallpaper {
     pub resolution: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Thumbs {
     pub large: String,
     pub original: String,
@@ -51,17 +51,24 @@ pub async fn fetch_search(
     app: tauri::AppHandle,
     sorting: String,
     page: Option<u32>,
+    query: Option<String>,
 ) -> Result<Vec<Wallpaper>, String> {
     let settings = load_settings(app);
     let client = build_client()?;
     let page_str = page.unwrap_or(1).to_string();
     let purity = settings.purity.clone();
+    let categories = settings.categories.clone();
     let atleast = settings.atleast.clone();
+    let query_str = query.unwrap_or_default();
     let mut req = client.get("https://wallhaven.cc/api/v1/search").query(&[
         ("sorting", sorting.as_str()),
         ("purity", purity.as_str()),
+        ("categories", categories.as_str()),
         ("page", page_str.as_str()),
     ]);
+    if !query_str.is_empty() {
+        req = req.query(&[("q", query_str.as_str())]);
+    }
     if !atleast.is_empty() {
         req = req.query(&[("atleast", atleast.as_str())]);
     }
@@ -81,8 +88,12 @@ pub async fn fetch_search(
         let mut retry = client.get("https://wallhaven.cc/api/v1/search").query(&[
             ("sorting", sorting.as_str()),
             ("purity", "100"),
+            ("categories", categories.as_str()),
             ("page", page_str.as_str()),
         ]);
+        if !query_str.is_empty() {
+            retry = retry.query(&[("q", query_str.as_str())]);
+        }
         if !atleast.is_empty() {
             retry = retry.query(&[("atleast", atleast.as_str())]);
         }
@@ -139,13 +150,13 @@ pub async fn fetch_collections(app: tauri::AppHandle) -> Result<Vec<Collection>,
 }
 
 #[tauri::command]
-pub async fn set_wallpaper(app: tauri::AppHandle, image_url: String) -> Result<(), String> {
+pub async fn set_wallpaper(app: tauri::AppHandle, wallpaper: Wallpaper) -> Result<(), String> {
     let client = build_client()?;
 
     let settings = load_settings(app.clone());
     let api_key = settings.api_key.trim().to_string();
 
-    let mut req = client.get(&image_url);
+    let mut req = client.get(&wallpaper.path);
     if !api_key.is_empty() {
         req = req.header("X-API-Key", &api_key);
     }
@@ -159,7 +170,7 @@ pub async fn set_wallpaper(app: tauri::AppHandle, image_url: String) -> Result<(
         .map_err(|e| format!("reading image failed: {e}"))?;
 
     // Extract filename from URL
-    let filename = image_url.rsplit('/').next().unwrap_or("wallpaper.jpg");
+    let filename = wallpaper.path.rsplit('/').next().unwrap_or("wallpaper.jpg");
 
     let cache_dir = app
         .path()
@@ -170,7 +181,11 @@ pub async fn set_wallpaper(app: tauri::AppHandle, image_url: String) -> Result<(
 
     fs::write(&file_path, &bytes).map_err(|e| format!("write failed: {e}"))?;
 
-    crate::setwallpaper::set(file_path.to_str().unwrap())
+    crate::setwallpaper::set(file_path.to_str().unwrap())?;
+
+    crate::history::add_to_history(&app, &wallpaper)?;
+
+    Ok(())
 }
 
 #[tauri::command]

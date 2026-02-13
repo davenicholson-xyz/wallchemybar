@@ -8,6 +8,8 @@ pub struct Settings {
     pub api_key: String,
     #[serde(default = "default_purity")]
     pub purity: String,
+    #[serde(default = "default_categories")]
+    pub categories: String,
     #[serde(default)]
     pub atleast: String,
 }
@@ -16,12 +18,17 @@ fn default_purity() -> String {
     "100".to_string()
 }
 
+fn default_categories() -> String {
+    "111".to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
             username: String::new(),
             api_key: String::new(),
             purity: default_purity(),
+            categories: default_categories(),
             atleast: String::new(),
         }
     }
