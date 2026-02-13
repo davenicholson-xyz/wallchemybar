@@ -14,7 +14,7 @@
       {
         "label": "main",
         "title": "wallchemybar",
-        "width": 300,
+        "width": 500,
         "height": 500,
         "visible": false,
         "decorations": false,
@@ -27,7 +27,7 @@
         "title": "Settings",
         "url": "/settings",
         "width": 400,
-        "height": 250,
+        "height": 340,
         "visible": false,
         "decorations": true,
         "resizable": false,

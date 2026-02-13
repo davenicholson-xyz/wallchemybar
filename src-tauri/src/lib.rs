@@ -1,47 +1,25 @@
-use serde::{Deserialize, Serialize};
-use std::fs;
+mod settings;
+mod setwallpaper;
+mod wallhaven;
+
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Manager, PhysicalPosition, WindowEvent,
 };
 
-#[derive(Debug, Serialize, Deserialize, Default)]
-pub struct Settings {
-    pub username: String,
-    pub api_key: String,
-}
-
-fn settings_path(app: &tauri::AppHandle) -> std::path::PathBuf {
-    let dir = app
-        .path()
-        .app_config_dir()
-        .expect("failed to get config dir");
-    fs::create_dir_all(&dir).ok();
-    dir.join("settings.json")
-}
-
-#[tauri::command]
-fn load_settings(app: tauri::AppHandle) -> Settings {
-    let path = settings_path(&app);
-    fs::read_to_string(&path)
-        .ok()
-        .and_then(|s| serde_json::from_str(&s).ok())
-        .unwrap_or_default()
-}
-
-#[tauri::command]
-fn save_settings(app: tauri::AppHandle, settings: Settings) -> Result<(), String> {
-    let path = settings_path(&app);
-    let json = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
-    fs::write(&path, json).map_err(|e| e.to_string())
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![load_settings, save_settings])
+        .invoke_handler(tauri::generate_handler![
+            settings::load_settings,
+            settings::save_settings,
+            wallhaven::fetch_search,
+            wallhaven::fetch_collections,
+            wallhaven::fetch_collection_wallpapers,
+            wallhaven::set_wallpaper
+        ])
         .setup(|app| {
             let icon = app
                 .default_window_icon()
@@ -56,7 +34,7 @@ pub fn run() {
                 .icon(icon)
                 .tooltip("wallchemybar")
                 .menu(&menu)
-                .menu_on_left_click(false)
+                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "settings" => {
                         if let Some(window) = app.get_webview_window("settings") {
