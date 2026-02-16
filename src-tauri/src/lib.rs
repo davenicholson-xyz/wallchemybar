@@ -9,6 +9,14 @@ use tauri::{
     Manager, PhysicalPosition, WindowEvent,
 };
 
+#[tauri::command]
+fn open_settings(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("settings") {
+        let _ = window.show();
+        let _ = window.set_focus();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -21,7 +29,8 @@ pub fn run() {
             wallhaven::fetch_collection_wallpapers,
             wallhaven::set_wallpaper,
             history::get_history,
-            history::clear_history
+            history::clear_history,
+            open_settings
         ])
         .setup(|app| {
             let icon = app
