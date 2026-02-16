@@ -10,6 +10,13 @@ use tauri::{
 };
 
 #[tauri::command]
+fn hide_main(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.hide();
+    }
+}
+
+#[tauri::command]
 fn open_settings(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.show();
@@ -30,7 +37,9 @@ pub fn run() {
             wallhaven::set_wallpaper,
             history::get_history,
             history::clear_history,
-            open_settings
+            history::undo_wallpaper,
+            open_settings,
+            hide_main
         ])
         .setup(|app| {
             let icon = app

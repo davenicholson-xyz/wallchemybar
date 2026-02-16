@@ -60,6 +60,19 @@
     let mainEl: HTMLElement;
     let searchInput = $state("");
     let selectedCollectionId: number | null = $state(null);
+    let undoing = $state(false);
+
+    async function undoWallpaper() {
+        undoing = true;
+        try {
+            await invoke("undo_wallpaper");
+            invoke("hide_main");
+        } catch (e) {
+            error = String(e);
+        } finally {
+            undoing = false;
+        }
+    }
 
     onMount(async () => {
         invoke("fetch_collections")
@@ -200,6 +213,7 @@
     }
 
     async function applyWallpaper(wp: Wallpaper) {
+        invoke("hide_main");
         settingWallpaper = wp.id;
         try {
             await invoke("set_wallpaper", { wallpaper: wp });
@@ -227,6 +241,7 @@
 
     function openSettings() {
         invoke("open_settings");
+        invoke("hide_main");
     }
 
     function isActive(cat: { sorting: string }): boolean {
@@ -303,6 +318,18 @@
             </button>
         {/if}
         <div class="spacer"></div>
+        <button
+            class="nav-btn"
+            title="Undo"
+            onclick={undoWallpaper}
+            disabled={undoing}
+        >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path
+                    d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
+                />
+            </svg>
+        </button>
         <button class="nav-btn" title="Settings" onclick={openSettings}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path

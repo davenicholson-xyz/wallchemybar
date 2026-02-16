@@ -61,6 +61,33 @@ pub fn get_history(app: tauri::AppHandle) -> Vec<HistoryEntry> {
 }
 
 #[tauri::command]
+pub fn undo_wallpaper(app: tauri::AppHandle) -> Result<(), String> {
+    let entries = load_history_entries(&app);
+    if entries.len() < 2 {
+        return Err("No previous wallpaper to revert to".into());
+    }
+    let prev = &entries[1];
+    let filename = prev.path.rsplit('/').next().unwrap_or("wallpaper.jpg");
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("cache dir error: {e}"))?;
+    let file_path = cache_dir.join(filename);
+    if !file_path.exists() {
+        return Err("Previous wallpaper not in cache".into());
+    }
+    crate::setwallpaper::set(file_path.to_str().unwrap())?;
+    // Move the previous entry to the top of history
+    let mut entries = entries;
+    let entry = entries.remove(1);
+    entries[0] = HistoryEntry {
+        applied_at: chrono::Utc::now().to_rfc3339(),
+        ..entry
+    };
+    save_history_entries(&app, &entries)
+}
+
+#[tauri::command]
 pub fn clear_history(app: tauri::AppHandle) -> Result<(), String> {
     save_history_entries(&app, &[])
 }

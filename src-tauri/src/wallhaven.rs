@@ -151,24 +151,6 @@ pub async fn fetch_collections(app: tauri::AppHandle) -> Result<Vec<Collection>,
 
 #[tauri::command]
 pub async fn set_wallpaper(app: tauri::AppHandle, wallpaper: Wallpaper) -> Result<(), String> {
-    let client = build_client()?;
-
-    let settings = load_settings(app.clone());
-    let api_key = settings.api_key.trim().to_string();
-
-    let mut req = client.get(&wallpaper.path);
-    if !api_key.is_empty() {
-        req = req.header("X-API-Key", &api_key);
-    }
-
-    let bytes = req
-        .send()
-        .await
-        .map_err(|e| format!("download failed: {e}"))?
-        .bytes()
-        .await
-        .map_err(|e| format!("reading image failed: {e}"))?;
-
     // Extract filename from URL
     let filename = wallpaper.path.rsplit('/').next().unwrap_or("wallpaper.jpg");
 
@@ -179,7 +161,27 @@ pub async fn set_wallpaper(app: tauri::AppHandle, wallpaper: Wallpaper) -> Resul
     fs::create_dir_all(&cache_dir).ok();
     let file_path = cache_dir.join(filename);
 
-    fs::write(&file_path, &bytes).map_err(|e| format!("write failed: {e}"))?;
+    if !file_path.exists() {
+        let client = build_client()?;
+
+        let settings = load_settings(app.clone());
+        let api_key = settings.api_key.trim().to_string();
+
+        let mut req = client.get(&wallpaper.path);
+        if !api_key.is_empty() {
+            req = req.header("X-API-Key", &api_key);
+        }
+
+        let bytes = req
+            .send()
+            .await
+            .map_err(|e| format!("download failed: {e}"))?
+            .bytes()
+            .await
+            .map_err(|e| format!("reading image failed: {e}"))?;
+
+        fs::write(&file_path, &bytes).map_err(|e| format!("write failed: {e}"))?;
+    }
 
     crate::setwallpaper::set(file_path.to_str().unwrap())?;
 
