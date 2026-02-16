@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::fs;
 use tauri::Manager;
 
@@ -39,6 +40,7 @@ fn save_history_entries(app: &tauri::AppHandle, entries: &[HistoryEntry]) -> Res
 
 pub fn add_to_history(app: &tauri::AppHandle, wallpaper: &Wallpaper) -> Result<(), String> {
     let mut entries = load_history_entries(app);
+    entries.retain(|e| e.id != wallpaper.id);
     let entry = HistoryEntry {
         id: wallpaper.id.clone(),
         url: wallpaper.url.clone(),
@@ -53,7 +55,9 @@ pub fn add_to_history(app: &tauri::AppHandle, wallpaper: &Wallpaper) -> Result<(
 
 #[tauri::command]
 pub fn get_history(app: tauri::AppHandle) -> Vec<HistoryEntry> {
-    load_history_entries(&app)
+    let entries = load_history_entries(&app);
+    let mut seen = HashSet::new();
+    entries.into_iter().filter(|e| seen.insert(e.id.clone())).collect()
 }
 
 #[tauri::command]
