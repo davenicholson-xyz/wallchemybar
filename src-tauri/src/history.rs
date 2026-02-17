@@ -88,6 +88,13 @@ pub fn undo_wallpaper(app: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn delete_history_entry(app: tauri::AppHandle, wallpaper_id: String) -> Result<(), String> {
+    let mut entries = load_history_entries(&app);
+    entries.retain(|e| e.id != wallpaper_id);
+    save_history_entries(&app, &entries)
+}
+
+#[tauri::command]
 pub fn clear_history(app: tauri::AppHandle) -> Result<(), String> {
     save_history_entries(&app, &[])
 }

@@ -35,8 +35,10 @@ pub fn run() {
             wallhaven::fetch_collections,
             wallhaven::fetch_collection_wallpapers,
             wallhaven::set_wallpaper,
+            wallhaven::fetch_wallpaper_tags,
             history::get_history,
             history::clear_history,
+            history::delete_history_entry,
             history::undo_wallpaper,
             open_settings,
             hide_main

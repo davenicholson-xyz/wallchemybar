@@ -5,12 +5,20 @@ use tauri::Manager;
 use crate::settings::load_settings;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Tag {
+    pub id: u64,
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Wallpaper {
     pub id: String,
     pub url: String,
     pub path: String,
     pub thumbs: Thumbs,
     pub resolution: String,
+    #[serde(default)]
+    pub tags: Vec<Tag>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -32,6 +40,16 @@ pub struct Collection {
 #[derive(Debug, Deserialize)]
 struct SearchResponse {
     data: Vec<Wallpaper>,
+}
+
+#[derive(Debug, Deserialize)]
+struct WallpaperInfoResponse {
+    data: WallpaperInfo,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct WallpaperInfo {
+    pub tags: Vec<Tag>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -228,4 +246,35 @@ pub async fn fetch_collection_wallpapers(
         serde_json::from_str(&text).map_err(|e| format!("parse failed: {e}"))?;
 
     Ok(resp.data)
+}
+
+#[tauri::command]
+pub async fn fetch_wallpaper_tags(
+    app: tauri::AppHandle,
+    wallpaper_id: String,
+) -> Result<Vec<Tag>, String> {
+    let settings = load_settings(app);
+    let client = build_client()?;
+
+    let mut req = client.get(format!(
+        "https://wallhaven.cc/api/v1/w/{wallpaper_id}"
+    ));
+
+    let api_key = settings.api_key.trim().to_string();
+    if !api_key.is_empty() {
+        req = req.header("X-API-Key", &api_key);
+    }
+
+    let text = req
+        .send()
+        .await
+        .map_err(|e| format!("request failed: {e}"))?
+        .text()
+        .await
+        .map_err(|e| format!("reading body failed: {e}"))?;
+
+    let resp: WallpaperInfoResponse =
+        serde_json::from_str(&text).map_err(|e| format!("parse failed: {e}"))?;
+
+    Ok(resp.data.tags)
 }

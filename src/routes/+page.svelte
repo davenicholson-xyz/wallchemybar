@@ -2,12 +2,18 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
 
+    interface Tag {
+        id: number;
+        name: string;
+    }
+
     interface Wallpaper {
         id: string;
         url: string;
         path: string;
         thumbs: { large: string; original: string; small: string };
         resolution: string;
+        tags?: Tag[];
     }
 
     interface Collection {
@@ -61,6 +67,9 @@
     let searchInput = $state("");
     let selectedCollectionId: number | null = $state(null);
     let undoing = $state(false);
+    let previewWallpaper: Wallpaper | null = $state(null);
+    let previewTags: Tag[] = $state([]);
+    let loadingTags = $state(false);
 
     async function undoWallpaper() {
         undoing = true;
@@ -239,9 +248,82 @@
         }
     }
 
+    async function deleteHistoryEntry(wp: Wallpaper) {
+        try {
+            await invoke("delete_history_entry", { wallpaperId: wp.id });
+            wallpapers = wallpapers.filter((w) => w.id !== wp.id);
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
     function openSettings() {
         invoke("open_settings");
         invoke("hide_main");
+    }
+
+    async function openPreview(wp: Wallpaper) {
+        previewWallpaper = wp;
+        previewTags = [];
+        loadingTags = true;
+        try {
+            const tags: Tag[] = await invoke("fetch_wallpaper_tags", { wallpaperId: wp.id });
+            if (previewWallpaper?.id === wp.id) {
+                previewTags = tags;
+            }
+        } catch {
+            // silently ignore — tags are non-critical
+        } finally {
+            loadingTags = false;
+        }
+    }
+
+    async function searchTag(tag: Tag) {
+        previewWallpaper = null;
+        const q = tag.name;
+        searchInput = q;
+        activeView = { kind: "query", query: q };
+        page = 1;
+        hasMore = true;
+        loading = true;
+        error = "";
+        try {
+            const results: Wallpaper[] = await invoke("fetch_search", {
+                sorting: "relevance",
+                page: 1,
+                query: q,
+            });
+            wallpapers = results;
+            hasMore = results.length >= 24;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function searchSimilar(wp: Wallpaper) {
+        const q = "like:" + wp.id;
+        previewWallpaper = null;
+        searchInput = q;
+        activeView = { kind: "query", query: q };
+        page = 1;
+        hasMore = true;
+        loading = true;
+        error = "";
+        try {
+            const results: Wallpaper[] = await invoke("fetch_search", {
+                sorting: "relevance",
+                page: 1,
+                query: q,
+            });
+            wallpapers = results;
+            hasMore = results.length >= 24;
+        } catch (e) {
+            error = String(e);
+        } finally {
+            loading = false;
+        }
     }
 
     function isActive(cat: { sorting: string }): boolean {
@@ -381,18 +463,42 @@
         {:else}
             <div class="grid">
                 {#each wallpapers as wp (wp.id)}
-                    <button
-                        class="thumb"
+                    <div
+                        class="thumb-wrapper"
                         class:setting={settingWallpaper === wp.id}
-                        onclick={() => applyWallpaper(wp)}
-                        disabled={settingWallpaper !== ""}
                     >
-                        <img src={wp.thumbs.small} alt={wp.id} />
+                        <button
+                            class="thumb"
+                            onclick={() => applyWallpaper(wp)}
+                            disabled={settingWallpaper !== ""}
+                        >
+                            <img src={wp.thumbs.small} alt={wp.id} />
 
-                        {#if settingWallpaper === wp.id}
-                            <span class="applying">...</span>
+                            {#if settingWallpaper === wp.id}
+                                <span class="applying">...</span>
+                            {/if}
+                        </button>
+                        <button
+                            class="preview-icon"
+                            onclick={() => openPreview(wp)}
+                            title="Preview"
+                        >
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                            </svg>
+                        </button>
+                        {#if activeView.kind === "history"}
+                            <button
+                                class="delete-icon"
+                                onclick={(e) => { e.stopPropagation(); deleteHistoryEntry(wp); }}
+                                title="Remove from history"
+                            >
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                </svg>
+                            </button>
                         {/if}
-                    </button>
+                    </div>
                 {/each}
             </div>
             {#if loadingMore}
@@ -401,6 +507,44 @@
         {/if}
     </main>
 </div>
+
+{#if previewWallpaper}
+    <!-- svelte-ignore a11y_no_static_element_interactions -->
+    <div class="preview-overlay" onclick={() => (previewWallpaper = null)} onkeydown={(e) => { if (e.key === 'Escape') previewWallpaper = null; }}>
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="preview-content" onclick={(e) => e.stopPropagation()}>
+            <button class="preview-close" onclick={() => (previewWallpaper = null)} title="Close">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+            </button>
+            <img class="preview-image" src={previewWallpaper.thumbs.large} alt={previewWallpaper.id} />
+            {#if previewTags.length > 0}
+                <div class="preview-tags">
+                    {#each previewTags as tag (tag.id)}
+                        <button class="tag-pill" onclick={() => searchTag(tag)}>{tag.name}</button>
+                    {/each}
+                </div>
+            {:else if loadingTags}
+                <div class="preview-tags-loading">Loading tags...</div>
+            {/if}
+            <div class="preview-actions">
+                <span class="preview-resolution">{previewWallpaper.resolution}</span>
+                <button class="preview-similar" onclick={() => searchSimilar(previewWallpaper!)} title="Find Similar">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
+                    </svg>
+                </button>
+                <button class="preview-apply" onclick={() => { applyWallpaper(previewWallpaper!); previewWallpaper = null; }} title="Apply Wallpaper">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+{/if}
 
 <style>
     :global(body) {
@@ -542,14 +686,19 @@
         padding: 4px;
     }
 
-    .thumb {
+    .thumb-wrapper {
         position: relative;
         overflow: hidden;
         border-radius: 4px;
+    }
+
+    .thumb {
+        width: 100%;
         cursor: pointer;
         border: none;
         padding: 0;
         background: none;
+        display: block;
     }
 
     .thumb img {
@@ -566,7 +715,7 @@
         opacity: 0.5;
     }
 
-    .thumb.setting {
+    .thumb-wrapper.setting .thumb {
         opacity: 1;
     }
 
@@ -580,5 +729,193 @@
         color: #fff;
         font-size: 14px;
         font-weight: bold;
+    }
+
+    .preview-icon {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 28px;
+        height: 28px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        opacity: 0;
+        transition: opacity 0.15s;
+    }
+
+    .preview-icon:hover {
+        background: rgba(0, 0, 0, 0.8);
+    }
+
+    .thumb-wrapper:hover .preview-icon,
+    .thumb-wrapper:hover .delete-icon {
+        opacity: 1;
+    }
+
+    .delete-icon {
+        position: absolute;
+        top: 4px;
+        left: 4px;
+        width: 28px;
+        height: 28px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.6);
+        color: #ff6b6b;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        opacity: 0;
+        transition: opacity 0.15s;
+    }
+
+    .delete-icon:hover {
+        background: rgba(255, 50, 50, 0.8);
+        color: #fff;
+    }
+
+    .preview-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+    }
+
+    .preview-content {
+        position: relative;
+        max-width: 90%;
+        max-height: 90%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .preview-close {
+        position: absolute;
+        top: -8px;
+        right: -8px;
+        width: 28px;
+        height: 28px;
+        border: none;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.15);
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        z-index: 1;
+        transition: background 0.15s;
+    }
+
+    .preview-close:hover {
+        background: rgba(255, 255, 255, 0.3);
+    }
+
+    .preview-image {
+        max-width: 538px;
+        max-height: 70vh;
+        border-radius: 6px;
+        object-fit: contain;
+    }
+
+    .preview-tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        max-width: 538px;
+        justify-content: center;
+    }
+
+    .preview-tags-loading {
+        color: #666;
+        font-size: 11px;
+    }
+
+    .tag-pill {
+        padding: 3px 10px;
+        border: 1px solid #444;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #bbb;
+        font-size: 11px;
+        cursor: pointer;
+        transition:
+            background 0.15s,
+            border-color 0.15s,
+            color 0.15s;
+    }
+
+    .tag-pill:hover {
+        background: rgba(255, 255, 255, 0.18);
+        border-color: #888;
+        color: #fff;
+    }
+
+    .preview-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+
+    .preview-resolution {
+        color: #999;
+        font-size: 12px;
+    }
+
+    .preview-similar {
+        width: 34px;
+        height: 34px;
+        border: 1px solid #555;
+        border-radius: 50%;
+        background: transparent;
+        color: #ccc;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition:
+            background 0.15s,
+            border-color 0.15s;
+    }
+
+    .preview-similar:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: #888;
+    }
+
+    .preview-apply {
+        width: 34px;
+        height: 34px;
+        border: none;
+        border-radius: 50%;
+        background: #646cff;
+        color: #fff;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        transition: background 0.15s;
+    }
+
+    .preview-apply:hover {
+        background: #535bf2;
     }
 </style>
