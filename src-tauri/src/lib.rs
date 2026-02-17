@@ -16,16 +16,14 @@ fn hide_main(app: tauri::AppHandle) {
     }
 }
 
-#[tauri::command]
-fn open_settings(app: tauri::AppHandle) {
-    if let Some(window) = app.get_webview_window("settings") {
-        let _ = window.show();
-        let _ = window.set_focus();
-    }
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format_timestamp_millis()
+        .init();
+
+    log::info!("wallchemybar starting up");
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
@@ -40,7 +38,6 @@ pub fn run() {
             history::clear_history,
             history::delete_history_entry,
             history::undo_wallpaper,
-            open_settings,
             hide_main
         ])
         .setup(|app| {
@@ -49,9 +46,8 @@ pub fn run() {
                 .cloned()
                 .expect("failed to load tray icon");
 
-            let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings_item, &quit])?;
+            let menu = Menu::with_items(app, &[&quit])?;
 
             TrayIconBuilder::new()
                 .icon(icon)
@@ -59,12 +55,6 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "settings" => {
-                        if let Some(window) = app.get_webview_window("settings") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
                     "quit" => {
                         app.exit(0);
                     }
@@ -113,17 +103,6 @@ pub fn run() {
                 let w = main_window.clone();
                 main_window.on_window_event(move |event| {
                     if let WindowEvent::Focused(false) = event {
-                        let _ = w.hide();
-                    }
-                });
-            }
-
-            // Intercept settings window close to hide instead of destroy
-            if let Some(settings_window) = app.get_webview_window("settings") {
-                let w = settings_window.clone();
-                settings_window.on_window_event(move |event| {
-                    if let WindowEvent::CloseRequested { api, .. } = event {
-                        api.prevent_close();
                         let _ = w.hide();
                     }
                 });

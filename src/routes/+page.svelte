@@ -29,7 +29,8 @@
         | { kind: "collections" }
         | { kind: "collection"; id: number }
         | { kind: "query"; query: string }
-        | { kind: "history" };
+        | { kind: "history" }
+        | { kind: "settings" };
 
     const categories: { label: string; sorting: string; icon: string }[] = [
         {
@@ -71,6 +72,24 @@
     let previewTags: Tag[] = $state([]);
     let loadingTags = $state(false);
 
+    // Settings state
+    let settingsUsername = $state("");
+    let settingsApiKey = $state("");
+    let settingsSfw = $state(true);
+    let settingsSketchy = $state(false);
+    let settingsNsfw = $state(false);
+    let settingsGeneral = $state(true);
+    let settingsAnime = $state(true);
+    let settingsPeople = $state(true);
+    let settingsAtleast = $state("");
+    const availableResolutions = [
+        "1280x720", "1280x800", "1280x960", "1280x1024",
+        "1600x900", "1600x1000", "1600x1200", "1600x1280",
+        "1920x1080", "1920x1200", "1920x1440", "1920x1536",
+        "2560x1080", "2560x1440", "2560x1600", "2560x1920", "2560x2048",
+        "3440x1440", "3840x1600", "3840x2160", "3840x2400", "3840x2880", "3840x3072",
+    ];
+
     async function undoWallpaper() {
         undoing = true;
         try {
@@ -94,6 +113,7 @@
     });
 
     async function loadSearch(sorting: string) {
+        console.log(`[wallchemybar] loadSearch: sorting=${sorting}`);
         activeView = { kind: "search", sorting };
         page = 1;
         hasMore = true;
@@ -106,7 +126,9 @@
             });
             wallpapers = results;
             hasMore = results.length >= 24;
+            console.log(`[wallchemybar] loadSearch: got ${results.length} results, hasMore=${hasMore}`);
         } catch (e) {
+            console.error("[wallchemybar] loadSearch: error:", e);
             error = String(e);
         } finally {
             loading = false;
@@ -182,8 +204,11 @@
 
     async function loadNextPage() {
         if (loadingMore || !hasMore) return;
+        if (activeView.kind === "history") return;
         loadingMore = true;
         const nextPage = page + 1;
+        const startTime = performance.now();
+        console.log(`[wallchemybar] loadNextPage: requesting page ${nextPage}, view=${activeView.kind}, current total=${wallpapers.length}`);
         try {
             let results: Wallpaper[];
             if (activeView.kind === "search") {
@@ -197,28 +222,51 @@
                     page: nextPage,
                     query: activeView.query,
                 });
-            } else {
+            } else if (activeView.kind === "collection") {
                 results = await invoke("fetch_collection_wallpapers", {
                     collectionId: activeView.id,
                     page: nextPage,
                 });
+            } else {
+                console.warn(`[wallchemybar] loadNextPage: unexpected view kind: ${activeView.kind}`);
+                loadingMore = false;
+                return;
             }
-            wallpapers = [...wallpapers, ...results];
+            const elapsed = (performance.now() - startTime).toFixed(0);
+            const existingIds = new Set(wallpapers.map((w) => w.id));
+            const newResults = results.filter((w) => !existingIds.has(w.id));
+            const dupes = results.length - newResults.length;
+            if (dupes > 0) {
+                console.warn(`[wallchemybar] loadNextPage: filtered ${dupes} duplicate wallpapers from page ${nextPage}`);
+            }
+            console.log(`[wallchemybar] loadNextPage: got ${results.length} results (${newResults.length} new) for page ${nextPage} in ${elapsed}ms`);
+            wallpapers = [...wallpapers, ...newResults];
             page = nextPage;
             hasMore = results.length >= 24;
+            console.log(`[wallchemybar] loadNextPage: hasMore=${hasMore}, total wallpapers=${wallpapers.length}`);
         } catch (e) {
-            error = String(e);
+            console.error(`[wallchemybar] loadNextPage: error on page ${nextPage}:`, e);
+            // Don't wipe the grid — show the error alongside existing results
+            hasMore = false;
         } finally {
             loadingMore = false;
         }
     }
 
+    let scrollTicking = false;
     function onScroll() {
-        if (!mainEl) return;
-        const { scrollTop, scrollHeight, clientHeight } = mainEl;
-        if (scrollHeight - scrollTop - clientHeight < 200) {
-            loadNextPage();
-        }
+        if (scrollTicking) return;
+        scrollTicking = true;
+        requestAnimationFrame(() => {
+            scrollTicking = false;
+            if (!mainEl) return;
+            const { scrollTop, scrollHeight, clientHeight } = mainEl;
+            const remaining = scrollHeight - scrollTop - clientHeight;
+            if (remaining < 200) {
+                console.log(`[wallchemybar] onScroll: near bottom (${remaining.toFixed(0)}px remaining), loadingMore=${loadingMore}, hasMore=${hasMore}`);
+                loadNextPage();
+            }
+        });
     }
 
     async function applyWallpaper(wp: Wallpaper) {
@@ -257,9 +305,51 @@
         }
     }
 
-    function openSettings() {
-        invoke("open_settings");
-        invoke("hide_main");
+    async function openSettings() {
+        activeView = { kind: "settings" };
+        loading = true;
+        try {
+            const settings: {
+                username: string;
+                api_key: string;
+                purity: string;
+                categories: string;
+                atleast: string;
+            } = await invoke("load_settings");
+            settingsUsername = settings.username;
+            settingsApiKey = settings.api_key;
+            settingsSfw = settings.purity[0] === "1";
+            settingsSketchy = settings.purity[1] === "1";
+            settingsNsfw = settings.purity[2] === "1";
+            const cats = settings.categories ?? "111";
+            settingsGeneral = cats[0] === "1";
+            settingsAnime = cats[1] === "1";
+            settingsPeople = cats[2] === "1";
+            settingsAtleast = settings.atleast ?? "";
+        } catch (e) {
+            error = String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function saveSettings() {
+        const purity = `${settingsSfw ? "1" : "0"}${settingsSketchy ? "1" : "0"}${settingsNsfw ? "1" : "0"}`;
+        const categories = `${settingsGeneral ? "1" : "0"}${settingsAnime ? "1" : "0"}${settingsPeople ? "1" : "0"}`;
+        await invoke("save_settings", {
+            settings: {
+                username: settingsUsername,
+                api_key: settingsApiKey,
+                purity,
+                categories,
+                atleast: settingsAtleast,
+            },
+        });
+        await loadSearch("hot");
+    }
+
+    async function clearHistory() {
+        await invoke("clear_history");
     }
 
     async function openPreview(wp: Wallpaper) {
@@ -412,7 +502,7 @@
                 />
             </svg>
         </button>
-        <button class="nav-btn" title="Settings" onclick={openSettings}>
+        <button class="nav-btn" class:active={activeView.kind === "settings"} title="Settings" onclick={openSettings}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path
                     d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"
@@ -454,9 +544,50 @@
                 />
             </form>
         {/if}
-        {#if loading}
-            <p class="status">Loading...</p>
-        {:else if error}
+        {#if activeView.kind === "settings"}
+            <div class="settings-panel">
+                <h3 class="settings-title">Settings</h3>
+                <form class="settings-form" onsubmit={(e) => { e.preventDefault(); saveSettings(); }}>
+                    <label class="settings-label">
+                        <span class="settings-label-text">Username</span>
+                        <input type="text" class="settings-input" bind:value={settingsUsername} placeholder="wallhaven username" />
+                    </label>
+                    <label class="settings-label">
+                        <span class="settings-label-text">API Key</span>
+                        <input type="password" class="settings-input" bind:value={settingsApiKey} placeholder="wallhaven API key" />
+                    </label>
+                    <div class="settings-field">
+                        <span class="settings-label-text">Categories</span>
+                        <div class="settings-toggle-group">
+                            <button type="button" class="settings-toggle category" class:active={settingsGeneral} onclick={() => (settingsGeneral = !settingsGeneral)}>General</button>
+                            <button type="button" class="settings-toggle category" class:active={settingsAnime} onclick={() => (settingsAnime = !settingsAnime)}>Anime</button>
+                            <button type="button" class="settings-toggle category" class:active={settingsPeople} onclick={() => (settingsPeople = !settingsPeople)}>People</button>
+                        </div>
+                    </div>
+                    <div class="settings-field">
+                        <span class="settings-label-text">Purity</span>
+                        <div class="settings-toggle-group">
+                            <button type="button" class="settings-toggle sfw" class:active={settingsSfw} onclick={() => (settingsSfw = !settingsSfw)}>SFW</button>
+                            <button type="button" class="settings-toggle sketchy" class:active={settingsSketchy} onclick={() => (settingsSketchy = !settingsSketchy)}>Sketchy</button>
+                            <button type="button" class="settings-toggle nsfw" class:active={settingsNsfw} onclick={() => (settingsNsfw = !settingsNsfw)}>NSFW</button>
+                        </div>
+                    </div>
+                    <label class="settings-label">
+                        <span class="settings-label-text">Minimum Resolution</span>
+                        <select class="settings-input" bind:value={settingsAtleast}>
+                            <option value="">Any</option>
+                            {#each availableResolutions as res}
+                                <option value={res}>{res}</option>
+                            {/each}
+                        </select>
+                    </label>
+                    <button class="settings-save" type="submit">Save</button>
+                </form>
+                <div class="settings-danger">
+                    <button class="settings-clear-history" onclick={clearHistory}>Clear History</button>
+                </div>
+            </div>
+        {:else if loading}
             <p class="status error">{error}</p>
         {:else if wallpapers.length === 0}
             <p class="status">No wallpapers found</p>
@@ -575,7 +706,7 @@
         display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 8px 0;
+        padding: 8px 0 20px;
         gap: 4px;
         overflow-y: auto;
     }
@@ -917,5 +1048,161 @@
 
     .preview-apply:hover {
         background: #535bf2;
+    }
+
+    /* Settings panel */
+    .settings-panel {
+        padding: 16px;
+        overflow-y: auto;
+        height: 100%;
+        box-sizing: border-box;
+    }
+
+    .settings-title {
+        margin: 0 0 14px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: #f6f6f6;
+    }
+
+    .settings-form {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .settings-label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .settings-label-text {
+        font-weight: 500;
+        font-size: 11px;
+        color: #999;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .settings-field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .settings-input {
+        padding: 7px 10px;
+        border: 1px solid #333;
+        border-radius: 6px;
+        font-size: 12px;
+        background: #222;
+        color: #f6f6f6;
+        outline: none;
+        transition: border-color 0.2s;
+    }
+
+    .settings-input:focus {
+        border-color: #646cff;
+    }
+
+    .settings-input::placeholder {
+        color: #555;
+    }
+
+    .settings-input option {
+        background: #222;
+        color: #f6f6f6;
+    }
+
+    .settings-toggle-group {
+        display: flex;
+        gap: 6px;
+    }
+
+    .settings-toggle {
+        flex: 1;
+        padding: 6px 10px;
+        border: 2px solid transparent;
+        border-radius: 6px;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        color: #777;
+        background: #222;
+    }
+
+    .settings-toggle:hover {
+        background: #2a2a2a;
+    }
+
+    .settings-toggle.sfw.active {
+        background: linear-gradient(135deg, #4a6741 0%, #3d5a35 100%);
+        color: #d4e6cf;
+        border-color: #5a7d4f;
+    }
+
+    .settings-toggle.sketchy.active {
+        background: linear-gradient(135deg, #8a7a3a 0%, #6e622e 100%);
+        color: #e6ddb3;
+        border-color: #9e8d42;
+    }
+
+    .settings-toggle.nsfw.active {
+        background: linear-gradient(135deg, #7a3a3a 0%, #622e2e 100%);
+        color: #e6b3b3;
+        border-color: #9e4242;
+    }
+
+    .settings-toggle.category.active {
+        background: linear-gradient(135deg, #3a5a7a 0%, #2e4a62 100%);
+        color: #b3d4e6;
+        border-color: #4278a0;
+    }
+
+    .settings-save {
+        margin-top: 4px;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        background: #646cff;
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s, transform 0.1s;
+    }
+
+    .settings-save:hover {
+        opacity: 0.9;
+    }
+
+    .settings-save:active {
+        transform: scale(0.98);
+    }
+
+    .settings-danger {
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #333;
+    }
+
+    .settings-clear-history {
+        width: 100%;
+        padding: 8px 16px;
+        border: 2px solid #7a3a3a;
+        border-radius: 6px;
+        background: rgba(122, 58, 58, 0.15);
+        color: #e6b3b3;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s, border-color 0.2s;
+    }
+
+    .settings-clear-history:hover {
+        background: rgba(122, 58, 58, 0.3);
+        border-color: #9e4242;
     }
 </style>

@@ -21,17 +21,6 @@
         "resizable": false,
         "alwaysOnTop": true,
         "skipTaskbar": true
-      },
-      {
-        "label": "settings",
-        "title": "Settings",
-        "url": "/settings",
-        "width": 440,
-        "height": 640,
-        "visible": false,
-        "decorations": true,
-        "resizable": false,
-        "center": true
       }
     ],
     "security": {
