@@ -1,3 +1,4 @@
+use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use tauri::Manager;
@@ -71,9 +72,12 @@ pub async fn fetch_search(
     page: Option<u32>,
     query: Option<String>,
 ) -> Result<Vec<Wallpaper>, String> {
+    let page_num = page.unwrap_or(1);
+    info!("fetch_search: sorting={}, page={}, query={:?}", sorting, page_num, query);
+
     let settings = load_settings(app);
     let client = build_client()?;
-    let page_str = page.unwrap_or(1).to_string();
+    let page_str = page_num.to_string();
     let purity = settings.purity.clone();
     let categories = settings.categories.clone();
     let atleast = settings.atleast.clone();
@@ -99,10 +103,16 @@ pub async fn fetch_search(
     let response = req
         .send()
         .await
-        .map_err(|e| format!("request failed: {e}"))?;
+        .map_err(|e| {
+            error!("fetch_search: request failed: {e}");
+            format!("request failed: {e}")
+        })?;
+
+    debug!("fetch_search: response status={}", response.status());
 
     // If unauthorized (bad API key), retry without it
     let text = if response.status() == 401 && !api_key.is_empty() {
+        warn!("fetch_search: got 401, retrying without API key");
         let mut retry = client.get("https://wallhaven.cc/api/v1/search").query(&[
             ("sorting", sorting.as_str()),
             ("purity", "100"),
@@ -118,20 +128,38 @@ pub async fn fetch_search(
         retry
             .send()
             .await
-            .map_err(|e| format!("request failed: {e}"))?
+            .map_err(|e| {
+                error!("fetch_search: retry request failed: {e}");
+                format!("request failed: {e}")
+            })?
             .text()
             .await
-            .map_err(|e| format!("reading body failed: {e}"))?
+            .map_err(|e| {
+                error!("fetch_search: retry reading body failed: {e}");
+                format!("reading body failed: {e}")
+            })?
+    } else if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        error!("fetch_search: API returned status={}, body={}", status, &body[..body.len().min(500)]);
+        return Err(format!("API error: status {status}"));
     } else {
         response
             .text()
             .await
-            .map_err(|e| format!("reading body failed: {e}"))?
+            .map_err(|e| {
+                error!("fetch_search: reading body failed: {e}");
+                format!("reading body failed: {e}")
+            })?
     };
 
     let resp: SearchResponse =
-        serde_json::from_str(&text).map_err(|e| format!("parse failed: {e}"))?;
+        serde_json::from_str(&text).map_err(|e| {
+            error!("fetch_search: parse failed: {e}, body={}", &text[..text.len().min(500)]);
+            format!("parse failed: {e}")
+        })?;
 
+    info!("fetch_search: returned {} wallpapers for page {}", resp.data.len(), page_num);
     Ok(resp.data)
 }
 
@@ -169,7 +197,8 @@ pub async fn fetch_collections(app: tauri::AppHandle) -> Result<Vec<Collection>,
 
 #[tauri::command]
 pub async fn set_wallpaper(app: tauri::AppHandle, wallpaper: Wallpaper) -> Result<(), String> {
-    // Extract filename from URL
+    info!("set_wallpaper: id={}, path={}", wallpaper.id, wallpaper.path);
+
     let filename = wallpaper.path.rsplit('/').next().unwrap_or("wallpaper.jpg");
 
     let cache_dir = app
@@ -179,7 +208,10 @@ pub async fn set_wallpaper(app: tauri::AppHandle, wallpaper: Wallpaper) -> Resul
     fs::create_dir_all(&cache_dir).ok();
     let file_path = cache_dir.join(filename);
 
-    if !file_path.exists() {
+    if file_path.exists() {
+        debug!("set_wallpaper: using cached file {:?}", file_path);
+    } else {
+        info!("set_wallpaper: downloading to {:?}", file_path);
         let client = build_client()?;
 
         let settings = load_settings(app.clone());
@@ -190,21 +222,35 @@ pub async fn set_wallpaper(app: tauri::AppHandle, wallpaper: Wallpaper) -> Resul
             req = req.header("X-API-Key", &api_key);
         }
 
-        let bytes = req
+        let response = req
             .send()
             .await
-            .map_err(|e| format!("download failed: {e}"))?
+            .map_err(|e| {
+                error!("set_wallpaper: download failed: {e}");
+                format!("download failed: {e}")
+            })?;
+
+        debug!("set_wallpaper: download status={}", response.status());
+
+        let bytes = response
             .bytes()
             .await
-            .map_err(|e| format!("reading image failed: {e}"))?;
+            .map_err(|e| {
+                error!("set_wallpaper: reading image failed: {e}");
+                format!("reading image failed: {e}")
+            })?;
 
-        fs::write(&file_path, &bytes).map_err(|e| format!("write failed: {e}"))?;
+        info!("set_wallpaper: downloaded {} bytes", bytes.len());
+        fs::write(&file_path, &bytes).map_err(|e| {
+            error!("set_wallpaper: write failed: {e}");
+            format!("write failed: {e}")
+        })?;
     }
 
     crate::setwallpaper::set(file_path.to_str().unwrap())?;
-
     crate::history::add_to_history(&app, &wallpaper)?;
 
+    info!("set_wallpaper: applied successfully");
     Ok(())
 }
 
@@ -214,9 +260,12 @@ pub async fn fetch_collection_wallpapers(
     collection_id: u64,
     page: Option<u32>,
 ) -> Result<Vec<Wallpaper>, String> {
+    info!("fetch_collection_wallpapers: collection_id={}, page={:?}", collection_id, page);
+
     let settings = load_settings(app);
     let username = settings.username.trim().to_string();
     if username.is_empty() {
+        warn!("fetch_collection_wallpapers: username not configured");
         return Err("Username not configured. Set it in Settings.".into());
     }
 
@@ -234,17 +283,38 @@ pub async fn fetch_collection_wallpapers(
         req = req.query(&[("page", p.to_string())]);
     }
 
-    let text = req
+    let response = req
         .send()
         .await
-        .map_err(|e| format!("request failed: {e}"))?
+        .map_err(|e| {
+            error!("fetch_collection_wallpapers: request failed: {e}");
+            format!("request failed: {e}")
+        })?;
+
+    debug!("fetch_collection_wallpapers: response status={}", response.status());
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        error!("fetch_collection_wallpapers: API returned status={}, body={}", status, &body[..body.len().min(500)]);
+        return Err(format!("API error: status {status}"));
+    }
+
+    let text = response
         .text()
         .await
-        .map_err(|e| format!("reading body failed: {e}"))?;
+        .map_err(|e| {
+            error!("fetch_collection_wallpapers: reading body failed: {e}");
+            format!("reading body failed: {e}")
+        })?;
 
     let resp: SearchResponse =
-        serde_json::from_str(&text).map_err(|e| format!("parse failed: {e}"))?;
+        serde_json::from_str(&text).map_err(|e| {
+            error!("fetch_collection_wallpapers: parse failed: {e}, body={}", &text[..text.len().min(500)]);
+            format!("parse failed: {e}")
+        })?;
 
+    info!("fetch_collection_wallpapers: returned {} wallpapers", resp.data.len());
     Ok(resp.data)
 }
 
@@ -253,6 +323,8 @@ pub async fn fetch_wallpaper_tags(
     app: tauri::AppHandle,
     wallpaper_id: String,
 ) -> Result<Vec<Tag>, String> {
+    debug!("fetch_wallpaper_tags: wallpaper_id={}", wallpaper_id);
+
     let settings = load_settings(app);
     let client = build_client()?;
 
@@ -265,16 +337,34 @@ pub async fn fetch_wallpaper_tags(
         req = req.header("X-API-Key", &api_key);
     }
 
-    let text = req
+    let response = req
         .send()
         .await
-        .map_err(|e| format!("request failed: {e}"))?
+        .map_err(|e| {
+            error!("fetch_wallpaper_tags: request failed: {e}");
+            format!("request failed: {e}")
+        })?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        warn!("fetch_wallpaper_tags: API returned status={}", status);
+        return Err(format!("API error: status {status}"));
+    }
+
+    let text = response
         .text()
         .await
-        .map_err(|e| format!("reading body failed: {e}"))?;
+        .map_err(|e| {
+            error!("fetch_wallpaper_tags: reading body failed: {e}");
+            format!("reading body failed: {e}")
+        })?;
 
     let resp: WallpaperInfoResponse =
-        serde_json::from_str(&text).map_err(|e| format!("parse failed: {e}"))?;
+        serde_json::from_str(&text).map_err(|e| {
+            error!("fetch_wallpaper_tags: parse failed: {e}");
+            format!("parse failed: {e}")
+        })?;
 
+    debug!("fetch_wallpaper_tags: returned {} tags", resp.data.tags.len());
     Ok(resp.data.tags)
 }
