@@ -30,6 +30,7 @@
         | { kind: "collection"; id: number }
         | { kind: "query"; query: string }
         | { kind: "history" }
+        | { kind: "queue" }
         | { kind: "settings" };
 
     const categories: { label: string; sorting: string; icon: string }[] = [
@@ -71,6 +72,16 @@
     let previewWallpaper: Wallpaper | null = $state(null);
     let previewTags: Tag[] = $state([]);
     let loadingTags = $state(false);
+
+    // Queue state
+    let queue: Wallpaper[] = $state([]);
+    let queueIntervalMinutes = $state(30);
+    let queueRunning = $state(false);
+    let queueIndex = $state(0);
+    let queueTimerId: ReturnType<typeof setInterval> | undefined;
+    let dragFromIndex: number | null = $state(null);
+    let dragOverIndex: number | null = $state(null);
+    let queueDragging = $state(false);
 
     // Settings state
     let settingsUsername = $state("");
@@ -421,6 +432,140 @@
             activeView.kind === "search" && activeView.sorting === cat.sorting
         );
     }
+
+    // ─── Queue ───────────────────────────────────────────────────────────────
+
+    async function activateQueue() {
+        activeView = { kind: "queue" };
+        loading = true;
+        error = "";
+        try {
+            queue = await invoke("get_queue");
+        } catch (e) {
+            error = String(e);
+        } finally {
+            loading = false;
+        }
+    }
+
+    async function toggleQueue(wp: Wallpaper) {
+        const inQueue = queue.some((q) => q.id === wp.id);
+        try {
+            if (inQueue) {
+                await invoke("remove_from_queue", { wallpaperId: wp.id });
+            } else {
+                await invoke("add_to_queue", { wallpaper: wp });
+            }
+            queue = await invoke("get_queue");
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    function startCycling() {
+        if (queue.length === 0) return;
+        queueRunning = true;
+        queueTimerId = setInterval(advanceQueue, queueIntervalMinutes * 60 * 1000);
+    }
+
+    function stopCycling() {
+        queueRunning = false;
+        clearInterval(queueTimerId);
+        queueTimerId = undefined;
+    }
+
+    async function advanceQueue() {
+        const current = await invoke<Wallpaper[]>("get_queue");
+        if (current.length === 0) { stopCycling(); return; }
+        const idx = queueIndex % current.length;
+        queueIndex = (idx + 1) % current.length;
+        await applyWallpaper(current[idx]);
+    }
+
+    function changeQueueInterval(minutes: number) {
+        queueIntervalMinutes = minutes;
+        if (queueRunning) {
+            clearInterval(queueTimerId);
+            queueTimerId = setInterval(advanceQueue, minutes * 60 * 1000);
+        }
+    }
+
+    async function removeFromQueue(wp: Wallpaper) {
+        try {
+            await invoke("remove_from_queue", { wallpaperId: wp.id });
+            queue = await invoke("get_queue");
+            if (queueIndex >= queue.length && queueIndex > 0) {
+                queueIndex = queue.length - 1;
+            }
+            if (queue.length === 0) stopCycling();
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    async function clearQueue() {
+        try {
+            await invoke("clear_queue");
+            queue = [];
+            queueIndex = 0;
+            stopCycling();
+        } catch (e) {
+            error = String(e);
+        }
+    }
+
+    function onDragHandleMouseDown(e: MouseEvent, idx: number) {
+        e.preventDefault();
+        console.log(`[queue] drag start idx=${idx}`);
+        dragFromIndex = idx;
+        dragOverIndex = idx;
+        queueDragging = true;
+        window.addEventListener("mousemove", onQueueMouseMove);
+        window.addEventListener("mouseup", onQueueMouseUp);
+    }
+
+    function onQueueMouseMove(e: MouseEvent) {
+        const els = document.elementsFromPoint(e.clientX, e.clientY);
+        for (const el of els) {
+            const attr = (el as HTMLElement).dataset.queueIdx;
+            if (attr !== undefined) {
+                const idx = parseInt(attr);
+                if (dragOverIndex !== idx) {
+                    console.log(`[queue] hover over idx=${idx} (from=${dragFromIndex})`);
+                    dragOverIndex = idx;
+                }
+                return;
+            }
+        }
+    }
+
+    function onQueueMouseUp() {
+        window.removeEventListener("mousemove", onQueueMouseMove);
+        window.removeEventListener("mouseup", onQueueMouseUp);
+        console.log(`[queue] drop: from=${dragFromIndex} to=${dragOverIndex}`);
+        if (dragFromIndex !== null && dragOverIndex !== null && dragFromIndex !== dragOverIndex) {
+            const reordered = [...queue];
+            const [moved] = reordered.splice(dragFromIndex, 1);
+            reordered.splice(dragOverIndex, 0, moved);
+            console.log(`[queue] reordered:`, reordered.map(w => w.id));
+            queue = reordered;
+            invoke("reorder_queue", { wallpapers: reordered }).catch(err => { error = String(err); });
+        } else {
+            console.log(`[queue] drop skipped (same position or no source)`);
+        }
+        dragFromIndex = null;
+        dragOverIndex = null;
+        queueDragging = false;
+    }
+
+    const intervalOptions = [
+        { label: "5 min", value: 5 },
+        { label: "10 min", value: 10 },
+        { label: "15 min", value: 15 },
+        { label: "30 min", value: 30 },
+        { label: "1 hr", value: 60 },
+        { label: "2 hr", value: 120 },
+    ];
 </script>
 
 <div class="layout">
@@ -447,6 +592,16 @@
                 <path
                     d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z"
                 />
+            </svg>
+        </button>
+        <button
+            class="nav-btn"
+            class:active={activeView.kind === "queue"}
+            title="Queue"
+            onclick={activateQueue}
+        >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
             </svg>
         </button>
         <div class="divider"></div>
@@ -587,6 +742,91 @@
                     <button class="settings-clear-history" onclick={clearHistory}>Clear History</button>
                 </div>
             </div>
+        {:else if activeView.kind === "queue"}
+            <div class="queue-view">
+                <div class="queue-controls">
+                    <button
+                        class="queue-play-btn"
+                        class:running={queueRunning}
+                        onclick={() => queueRunning ? stopCycling() : startCycling()}
+                        disabled={queue.length === 0}
+                        title={queueRunning ? "Stop cycling" : "Start cycling"}
+                    >
+                        {#if queueRunning}
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+                            </svg>
+                            Stop
+                        {:else}
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                            Start
+                        {/if}
+                    </button>
+                    <div class="queue-interval">
+                        <span class="queue-interval-label">Cycle every</span>
+                        <div class="queue-interval-pills">
+                            {#each intervalOptions as opt}
+                                <button
+                                    class="queue-interval-pill"
+                                    class:active={queueIntervalMinutes === opt.value}
+                                    onclick={() => changeQueueInterval(opt.value)}
+                                >{opt.label}</button>
+                            {/each}
+                        </div>
+                    </div>
+                </div>
+                {#if queue.length === 0}
+                    <p class="status">Queue is empty — add wallpapers from search views</p>
+                {:else}
+                    <div class="grid" class:dragging={queueDragging}>
+                        {#each queue as wp, idx (wp.id)}
+                            <div
+                                class="thumb-wrapper"
+                                class:setting={settingWallpaper === wp.id}
+                                class:queue-active={idx === queueIndex % queue.length && queueRunning}
+                                class:drag-source={queueDragging && dragFromIndex === idx}
+                                class:drag-over={dragOverIndex === idx && queueDragging && dragFromIndex !== idx}
+                                data-queue-idx={idx}
+                            >
+                                <button
+                                    class="thumb"
+                                    onclick={() => applyWallpaper(wp)}
+                                    disabled={settingWallpaper !== ""}
+                                >
+                                    <img src={wp.thumbs.small} alt={wp.id} />
+                                    {#if settingWallpaper === wp.id}
+                                        <span class="applying">...</span>
+                                    {/if}
+                                </button>
+                                <button
+                                    class="delete-icon"
+                                    onclick={(e) => { e.stopPropagation(); removeFromQueue(wp); }}
+                                    title="Remove from queue"
+                                >
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                    </svg>
+                                </button>
+                                <!-- svelte-ignore a11y_no_static_element_interactions -->
+                                <div
+                                    class="drag-handle"
+                                    title="Drag to reorder"
+                                    onmousedown={(e) => onDragHandleMouseDown(e, idx)}
+                                >
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+                                    </svg>
+                                </div>
+                            </div>
+                        {/each}
+                    </div>
+                    <div class="queue-footer">
+                        <button class="queue-clear-btn" onclick={clearQueue}>Clear Queue</button>
+                    </div>
+                {/if}
+            </div>
         {:else if loading}
             <p class="status error">{error}</p>
         {:else if wallpapers.length === 0}
@@ -617,6 +857,22 @@
                             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
                                 <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                             </svg>
+                        </button>
+                        <button
+                            class="queue-icon"
+                            class:in-queue={queue.some((q) => q.id === wp.id)}
+                            onclick={(e) => { e.stopPropagation(); toggleQueue(wp); }}
+                            title={queue.some((q) => q.id === wp.id) ? "Remove from queue" : "Add to queue"}
+                        >
+                            {#if queue.some((q) => q.id === wp.id)}
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                </svg>
+                            {:else}
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/>
+                                </svg>
+                            {/if}
                         </button>
                         {#if activeView.kind === "history"}
                             <button
@@ -1332,5 +1588,234 @@
         background: rgba(122, 58, 58, 0.25);
         border-color: rgba(158, 66, 66, 0.6);
         box-shadow: 0 0 12px rgba(158, 66, 66, 0.15);
+    }
+
+    /* ─── Queue View ─── */
+    .queue-icon {
+        position: absolute;
+        bottom: 6px;
+        left: 6px;
+        width: 26px;
+        height: 26px;
+        border: none;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px);
+        color: rgba(255, 255, 255, 0.85);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity 0.2s ease-out, transform 0.2s ease-out, background 0.2s ease-out;
+    }
+
+    .queue-icon:hover {
+        background: rgba(80, 200, 120, 0.6);
+        color: #fff;
+    }
+
+    .queue-icon.in-queue {
+        background: rgba(60, 170, 100, 0.7);
+        color: #fff;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .thumb-wrapper:hover .queue-icon {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .queue-view {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+
+    .queue-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 10px 6px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+        flex-shrink: 0;
+    }
+
+    .queue-play-btn {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        padding: 6px 12px;
+        border: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, #646cff 0%, #535bf2 100%);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: box-shadow 0.2s ease-out, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+        white-space: nowrap;
+        flex-shrink: 0;
+        box-shadow: 0 2px 10px rgba(100, 108, 255, 0.25);
+    }
+
+    .queue-play-btn.running {
+        background: linear-gradient(135deg, #ff6b6b 0%, #ee4444 100%);
+        box-shadow: 0 2px 10px rgba(255, 80, 80, 0.25);
+    }
+
+    .queue-play-btn:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+
+    .queue-play-btn:not(:disabled):hover {
+        box-shadow: 0 4px 16px rgba(100, 108, 255, 0.4);
+        transform: scale(1.03);
+    }
+
+    .queue-play-btn.running:not(:disabled):hover {
+        box-shadow: 0 4px 16px rgba(255, 80, 80, 0.4);
+    }
+
+    .queue-interval {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .queue-interval-label {
+        font-size: 10px;
+        color: rgba(255, 255, 255, 0.4);
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .queue-interval-pills {
+        display: flex;
+        gap: 3px;
+        flex-wrap: wrap;
+    }
+
+    .queue-interval-pill {
+        padding: 3px 7px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 10px;
+        cursor: pointer;
+        transition: background 0.15s ease-out, color 0.15s ease-out, border-color 0.15s ease-out;
+    }
+
+    .queue-interval-pill:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .queue-interval-pill.active {
+        background: rgba(100, 108, 255, 0.25);
+        border-color: rgba(100, 108, 255, 0.5);
+        color: #b0b4ff;
+    }
+
+    .thumb-wrapper.queue-active {
+        box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.8), 0 0 16px rgba(100, 108, 255, 0.4);
+    }
+
+    /* Item being dragged — looks lifted/ghosted */
+    .thumb-wrapper.drag-source {
+        opacity: 0.35;
+        transform: scale(0.93);
+        box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.6);
+        z-index: 0;
+    }
+
+    /* Drop target — bright accent ring + scale */
+    .thumb-wrapper.drag-over {
+        box-shadow: 0 0 0 2px #646cff, 0 0 20px rgba(100, 108, 255, 0.55);
+        transform: scale(1.06);
+        z-index: 2;
+    }
+
+    /* All other items dim during drag */
+    .grid.dragging .thumb-wrapper:not(.drag-over):not(.drag-source) {
+        opacity: 0.55;
+        transform: none;
+        box-shadow: none;
+    }
+
+    .grid.dragging,
+    .grid.dragging .thumb-wrapper {
+        cursor: grabbing;
+    }
+
+    .drag-handle {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 22px;
+        height: 22px;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(8px);
+        color: rgba(255, 255, 255, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity 0.2s ease-out, transform 0.2s ease-out, background 0.15s ease-out;
+    }
+
+    .drag-handle:hover {
+        background: rgba(100, 108, 255, 0.5);
+        color: #fff;
+    }
+
+    .thumb-wrapper:hover .drag-handle,
+    .grid.dragging .drag-handle {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .grid.dragging .drag-source .drag-handle {
+        background: rgba(100, 108, 255, 0.7);
+        color: #fff;
+        cursor: grabbing;
+    }
+
+    .queue-footer {
+        padding: 8px 10px;
+        display: flex;
+        justify-content: center;
+        flex-shrink: 0;
+    }
+
+    .queue-clear-btn {
+        padding: 6px 14px;
+        border: 1px solid rgba(158, 66, 66, 0.4);
+        border-radius: 8px;
+        background: rgba(122, 58, 58, 0.1);
+        color: #d4a0a0;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease-out, border-color 0.2s ease-out;
+    }
+
+    .queue-clear-btn:hover {
+        background: rgba(122, 58, 58, 0.25);
+        border-color: rgba(158, 66, 66, 0.6);
+    }
+
+    .grid.dragging .thumb-wrapper {
+        cursor: grabbing;
     }
 </style>

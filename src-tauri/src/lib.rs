@@ -1,4 +1,5 @@
 mod history;
+mod queue;
 mod settings;
 mod setwallpaper;
 mod wallhaven;
@@ -38,6 +39,11 @@ pub fn run() {
             history::clear_history,
             history::delete_history_entry,
             history::undo_wallpaper,
+            queue::get_queue,
+            queue::add_to_queue,
+            queue::remove_from_queue,
+            queue::reorder_queue,
+            queue::clear_queue,
             hide_main
         ])
         .setup(|app| {
