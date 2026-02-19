@@ -60,9 +60,17 @@ pub fn run() {
                 .cloned()
                 .expect("failed to load tray icon");
 
-            let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            // On Linux with AppIndicator (common on Ubuntu/GNOME), show_menu_on_left_click(false)
+            // may not be respected and the menu always appears on left click. To avoid a confusing
+            // "Show / Hide" menu on left click, we only include "Quit" on Linux and rely on the
+            // click event for show/hide (which fires on desktops that support it).
+            #[cfg(not(target_os = "linux"))]
+            let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
+            #[cfg(not(target_os = "linux"))]
             let menu = Menu::with_items(app, &[&show, &quit])?;
+            #[cfg(target_os = "linux")]
+            let menu = Menu::with_items(app, &[&quit])?;
 
             // Guard against the Windows focus-loss race: clicking the tray icon
             // moves OS focus to the notification area, firing FocusLost on our
@@ -97,6 +105,7 @@ pub fn run() {
                 .on_tray_icon_event(move |tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         rect,
+                        button: tauri::tray::MouseButton::Left,
                         button_state: tauri::tray::MouseButtonState::Up,
                         ..
                     } = event
