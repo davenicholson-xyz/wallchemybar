@@ -36,53 +36,40 @@ mod platform {
             return Err("no screens found".to_string());
         }
 
-        // Spawn one thread per screen so all screens update in parallel.
-        // Each thread creates its own Obj-C objects — no cross-thread sharing.
-        let handles: Vec<_> = (0..count)
-            .map(|i| {
-                let path = path.to_owned();
-                std::thread::spawn(move || -> Result<(), String> {
-                    let path_c = CString::new(path.as_str())
-                        .map_err(|e| format!("invalid path: {e}"))?;
-                    unsafe {
-                        let alloc: *mut Object = msg_send![class!(NSString), alloc];
-                        let path_ns: *mut Object =
-                            msg_send![alloc, initWithUTF8String: path_c.as_ptr()];
-                        let url: *mut Object =
-                            msg_send![class!(NSURL), fileURLWithPath: path_ns];
-                        let options: *mut Object =
-                            msg_send![class!(NSDictionary), dictionary];
-                        let workspace: *mut Object =
-                            msg_send![class!(NSWorkspace), sharedWorkspace];
-                        let screens: *mut Object =
-                            msg_send![class!(NSScreen), screens];
-                        let screen: *mut Object =
-                            msg_send![screens, objectAtIndex: i];
+        // macOS serialises setDesktopImageURL calls internally (one per screen,
+        // ~5 s each). Spawn a detached thread per screen and return immediately
+        // so the UI isn't blocked — the wallpaper applies in the background.
+        // The file is already verified to exist before this function is called.
+        for i in 0..count {
+            let path = path.to_owned();
+            std::thread::spawn(move || {
+                let Ok(path_c) = CString::new(path.as_str()) else { return };
+                unsafe {
+                    let alloc: *mut Object = msg_send![class!(NSString), alloc];
+                    let path_ns: *mut Object =
+                        msg_send![alloc, initWithUTF8String: path_c.as_ptr()];
+                    let url: *mut Object =
+                        msg_send![class!(NSURL), fileURLWithPath: path_ns];
+                    let options: *mut Object =
+                        msg_send![class!(NSDictionary), dictionary];
+                    let workspace: *mut Object =
+                        msg_send![class!(NSWorkspace), sharedWorkspace];
+                    let screens: *mut Object =
+                        msg_send![class!(NSScreen), screens];
+                    let screen: *mut Object =
+                        msg_send![screens, objectAtIndex: i];
 
-                        let ok: bool = msg_send![
-                            workspace,
-                            setDesktopImageURL: url
-                            forScreen: screen
-                            options: options
-                            error: std::ptr::null_mut::<*mut Object>()
-                        ];
+                    let _ok: bool = msg_send![
+                        workspace,
+                        setDesktopImageURL: url
+                        forScreen: screen
+                        options: options
+                        error: std::ptr::null_mut::<*mut Object>()
+                    ];
 
-                        let _: () = msg_send![path_ns, release];
-
-                        if ok {
-                            Ok(())
-                        } else {
-                            Err(format!("setDesktopImageURL failed for screen {}", i))
-                        }
-                    }
-                })
-            })
-            .collect();
-
-        for handle in handles {
-            handle
-                .join()
-                .map_err(|_| "wallpaper thread panicked".to_string())??;
+                    let _: () = msg_send![path_ns, release];
+                }
+            });
         }
 
         Ok(())
