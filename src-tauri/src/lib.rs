@@ -60,8 +60,9 @@ pub fn run() {
                 .cloned()
                 .expect("failed to load tray icon");
 
+            let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
+            let menu = Menu::with_items(app, &[&show, &quit])?;
 
             // Guard against the Windows focus-loss race: clicking the tray icon
             // moves OS focus to the notification area, firing FocusLost on our
@@ -78,6 +79,16 @@ pub fn run() {
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                    }
                     "quit" => {
                         app.exit(0);
                     }
