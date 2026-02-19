@@ -13,16 +13,22 @@ use std::sync::{
     Arc,
 };
 use tauri::{
-    menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Manager, PhysicalPosition, WindowEvent,
 };
+#[cfg(not(target_os = "linux"))]
+use tauri::menu::{Menu, MenuItem};
 
 #[tauri::command]
 fn hide_main(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
     }
+}
+
+#[tauri::command]
+fn quit_app(app: tauri::AppHandle) {
+    app.exit(0);
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -52,7 +58,8 @@ pub fn run() {
             queue::remove_from_queue,
             queue::reorder_queue,
             queue::clear_queue,
-            hide_main
+            hide_main,
+            quit_app
         ])
         .setup(|app| {
             let icon = app
@@ -60,17 +67,16 @@ pub fn run() {
                 .cloned()
                 .expect("failed to load tray icon");
 
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             // On Linux with AppIndicator (common on Ubuntu/GNOME), show_menu_on_left_click(false)
-            // may not be respected and the menu always appears on left click. To avoid a confusing
-            // "Show / Hide" menu on left click, we only include "Quit" on Linux and rely on the
-            // click event for show/hide (which fires on desktops that support it).
+            // is ignored and the context menu always shows on left click, blocking the click event
+            // from firing. Attaching no menu forces AppIndicator to send the Activate signal
+            // instead, which fires our click event. Quit is accessible from the app window.
             #[cfg(not(target_os = "linux"))]
             let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
             #[cfg(not(target_os = "linux"))]
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            #[cfg(not(target_os = "linux"))]
             let menu = Menu::with_items(app, &[&show, &quit])?;
-            #[cfg(target_os = "linux")]
-            let menu = Menu::with_items(app, &[&quit])?;
 
             // Guard against the Windows focus-loss race: clicking the tray icon
             // moves OS focus to the notification area, firing FocusLost on our
@@ -81,11 +87,17 @@ pub fn run() {
             let just_shown_tray = just_shown.clone();
             let just_shown_focus = just_shown.clone();
 
-            TrayIconBuilder::new()
+            let tray_builder = TrayIconBuilder::new()
                 .icon(icon)
                 .tooltip("wallchemybar")
+                .show_menu_on_left_click(false);
+
+            // On Linux, attach no menu so AppIndicator fires the Activate (click) signal
+            // instead of always showing the context menu on left click.
+            // Quit is accessible from the app window's settings panel.
+            #[cfg(not(target_os = "linux"))]
+            let tray_builder = tray_builder
                 .menu(&menu)
-                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
@@ -101,7 +113,9 @@ pub fn run() {
                         app.exit(0);
                     }
                     _ => {}
-                })
+                });
+
+            tray_builder
                 .on_tray_icon_event(move |tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         rect,

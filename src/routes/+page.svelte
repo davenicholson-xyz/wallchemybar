@@ -703,8 +703,9 @@
                     </div>
                     <button class="btn btn-primary btn-sm mt-1" type="submit">Save</button>
                 </form>
-                <div class="mt-3.5 pt-3.5 border-t border-base-300">
+                <div class="mt-3.5 pt-3.5 border-t border-base-300 flex flex-col gap-2">
                     <button class="btn btn-error btn-outline btn-sm w-full" onclick={clearHistory}>Clear History</button>
+                    <button class="btn btn-ghost btn-sm w-full text-base-content/40" onclick={() => invoke('quit_app')}>Quit</button>
                 </div>
             </div>
 
