@@ -13,11 +13,10 @@ use std::sync::{
     Arc,
 };
 use tauri::{
+    menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Manager, PhysicalPosition, WindowEvent,
 };
-#[cfg(not(target_os = "linux"))]
-use tauri::menu::{Menu, MenuItem};
 
 #[tauri::command]
 fn hide_main(app: tauri::AppHandle) {
@@ -67,14 +66,17 @@ pub fn run() {
                 .cloned()
                 .expect("failed to load tray icon");
 
-            // On Linux with AppIndicator (common on Ubuntu/GNOME), show_menu_on_left_click(false)
-            // is ignored and the context menu always shows on left click, blocking the click event
-            // from firing. Attaching no menu forces AppIndicator to send the Activate signal
-            // instead, which fires our click event. Quit is accessible from the app window.
+            // On Ubuntu/GNOME with AppIndicator, the tray icon requires a menu to appear at all,
+            // and left click always shows the menu (show_menu_on_left_click(false) is ignored).
+            // On macOS/Windows, left click fires the click event directly — no menu needed.
+            // Linux uses "Open" (always shows) rather than "Show / Hide" (toggle) to be clear.
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            #[cfg(target_os = "linux")]
+            let open = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
             #[cfg(not(target_os = "linux"))]
             let show = MenuItem::with_id(app, "show", "Show / Hide", true, None::<&str>)?;
-            #[cfg(not(target_os = "linux"))]
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            #[cfg(target_os = "linux")]
+            let menu = Menu::with_items(app, &[&open, &quit])?;
             #[cfg(not(target_os = "linux"))]
             let menu = Menu::with_items(app, &[&show, &quit])?;
 
@@ -90,22 +92,25 @@ pub fn run() {
             let tray_builder = TrayIconBuilder::new()
                 .icon(icon)
                 .tooltip("wallchemybar")
-                .show_menu_on_left_click(false);
-
-            // On Linux, attach no menu so AppIndicator fires the Activate (click) signal
-            // instead of always showing the context menu on left click.
-            // Quit is accessible from the app window's settings panel.
-            #[cfg(not(target_os = "linux"))]
-            let tray_builder = tray_builder
                 .menu(&menu)
+                .show_menu_on_left_click(false)
                 .on_menu_event(|app, event| match event.id.as_ref() {
-                    "show" => {
+                    "open" | "show" => {
                         if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
+                            #[cfg(target_os = "linux")]
+                            {
+                                // On Linux/AppIndicator, always show (left click can't hide via event)
                                 let _ = window.show();
                                 let _ = window.set_focus();
+                            }
+                            #[cfg(not(target_os = "linux"))]
+                            {
+                                if window.is_visible().unwrap_or(false) {
+                                    let _ = window.hide();
+                                } else {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
                             }
                         }
                     }
