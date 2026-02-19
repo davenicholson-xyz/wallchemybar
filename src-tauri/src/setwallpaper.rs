@@ -22,25 +22,47 @@ pub fn set(path: &str) -> Result<(), String> {
 
 #[cfg(target_os = "macos")]
 mod platform {
-    use std::process::Command;
+    use objc::runtime::Object;
+    use std::ffi::CString;
 
     pub fn set_wallpaper(path: &str) -> Result<(), String> {
-        let script = format!(
-            "tell application \"System Events\" to set picture of every desktop to POSIX file \"{}\"",
-            path
-        );
-        let output = Command::new("osascript")
-            .arg("-e")
-            .arg(&script)
-            .output()
-            .map_err(|e| format!("failed to run osascript: {e}"))?;
+        let path_c = CString::new(path).map_err(|e| format!("invalid path: {e}"))?;
 
-        if !output.status.success() {
-            return Err(format!(
-                "osascript failed: {}",
-                String::from_utf8_lossy(&output.stderr)
-            ));
+        unsafe {
+            // NSString *pathNS = [[NSString alloc] initWithUTF8String:path]
+            let alloc: *mut Object = msg_send![class!(NSString), alloc];
+            let path_ns: *mut Object =
+                msg_send![alloc, initWithUTF8String: path_c.as_ptr()];
+
+            // NSURL *url = [NSURL fileURLWithPath:pathNS]
+            let url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: path_ns];
+
+            // NSDictionary *options = [NSDictionary dictionary]  (empty, autoreleased)
+            let options: *mut Object = msg_send![class!(NSDictionary), dictionary];
+
+            // [[NSWorkspace sharedWorkspace] setDesktopImageURL:url forScreen:screen options:options error:nil]
+            let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+            let screens: *mut Object = msg_send![class!(NSScreen), screens];
+            let count: usize = msg_send![screens, count];
+
+            for i in 0usize..count {
+                let screen: *mut Object = msg_send![screens, objectAtIndex: i];
+                let ok: bool = msg_send![
+                    workspace,
+                    setDesktopImageURL: url
+                    forScreen: screen
+                    options: options
+                    error: std::ptr::null_mut::<*mut Object>()
+                ];
+                if !ok {
+                    let _: () = msg_send![path_ns, release];
+                    return Err(format!("setDesktopImageURL failed for screen {}", i));
+                }
+            }
+
+            let _: () = msg_send![path_ns, release];
         }
+
         Ok(())
     }
 }

@@ -4,6 +4,10 @@ mod settings;
 mod setwallpaper;
 mod wallhaven;
 
+#[cfg(target_os = "macos")]
+#[macro_use]
+extern crate objc;
+
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
