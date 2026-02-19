@@ -4,6 +4,10 @@ mod settings;
 mod setwallpaper;
 mod wallhaven;
 
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
@@ -55,6 +59,15 @@ pub fn run() {
             let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit])?;
 
+            // Guard against the Windows focus-loss race: clicking the tray icon
+            // moves OS focus to the notification area, firing FocusLost on our
+            // window *before* the tray click event arrives. Without this flag the
+            // FocusLost handler hides the window and the tray handler immediately
+            // shows it again (or vice-versa), so the window never stays visible.
+            let just_shown = Arc::new(AtomicBool::new(false));
+            let just_shown_tray = just_shown.clone();
+            let just_shown_focus = just_shown.clone();
+
             TrayIconBuilder::new()
                 .icon(icon)
                 .tooltip("wallchemybar")
@@ -66,7 +79,7 @@ pub fn run() {
                     }
                     _ => {}
                 })
-                .on_tray_icon_event(|tray, event| {
+                .on_tray_icon_event(move |tray, event| {
                     if let tauri::tray::TrayIconEvent::Click {
                         rect,
                         button_state: tauri::tray::MouseButtonState::Up,
@@ -76,13 +89,14 @@ pub fn run() {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
                             if window.is_visible().unwrap_or(false) {
+                                just_shown_tray.store(false, Ordering::Relaxed);
                                 let _ = window.hide();
                             } else {
                                 let scale = window.scale_factor().unwrap_or(1.0);
 
                                 let window_size =
                                     window.outer_size().unwrap_or(tauri::PhysicalSize {
-                                        width: 300,
+                                        width: 500,
                                         height: 500,
                                     });
 
@@ -91,25 +105,59 @@ pub fn run() {
                                 let icon_size: tauri::PhysicalSize<f64> =
                                     rect.size.to_physical(scale);
 
-                                let x = icon_pos.x + (icon_size.width / 2.0)
-                                    - (window_size.width as f64 / 2.0);
-                                let y = icon_pos.y + icon_size.height;
+                                // Detect screen bounds so we can position the window
+                                // above the tray icon on Windows (bottom taskbar) or
+                                // below it on macOS (top menu bar).
+                                let (screen_w, screen_h) = window
+                                    .current_monitor()
+                                    .ok()
+                                    .flatten()
+                                    .map(|m| {
+                                        (m.size().width as f64, m.size().height as f64)
+                                    })
+                                    .unwrap_or((1920.0, 1080.0));
 
+                                let icon_center_y = icon_pos.y + icon_size.height / 2.0;
+                                let y = if icon_center_y > screen_h / 2.0 {
+                                    // Bottom half of screen — place window above icon
+                                    icon_pos.y - window_size.height as f64
+                                } else {
+                                    // Top half of screen — place window below icon
+                                    icon_pos.y + icon_size.height
+                                };
+
+                                // Clamp x so the window doesn't overflow the right edge
+                                let x = (icon_pos.x + icon_size.width / 2.0
+                                    - window_size.width as f64 / 2.0)
+                                    .max(0.0)
+                                    .min(screen_w - window_size.width as f64);
+
+                                just_shown_tray.store(true, Ordering::Relaxed);
                                 let _ = window.set_position(PhysicalPosition::new(x, y));
                                 let _ = window.show();
                                 let _ = window.set_focus();
+
+                                // Clear the guard after a short grace period
+                                let flag = just_shown_tray.clone();
+                                std::thread::spawn(move || {
+                                    std::thread::sleep(std::time::Duration::from_millis(300));
+                                    flag.store(false, Ordering::Relaxed);
+                                });
                             }
                         }
                     }
                 })
                 .build(app)?;
 
-            // Hide main window when it loses focus
+            // Hide main window when it loses focus, but not during the grace
+            // period right after we show it (works around Windows focus-race).
             if let Some(main_window) = app.get_webview_window("main") {
                 let w = main_window.clone();
                 main_window.on_window_event(move |event| {
                     if let WindowEvent::Focused(false) = event {
-                        let _ = w.hide();
+                        if !just_shown_focus.load(Ordering::Relaxed) {
+                            let _ = w.hide();
+                        }
                     }
                 });
             }
