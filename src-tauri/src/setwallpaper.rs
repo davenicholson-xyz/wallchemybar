@@ -26,41 +26,63 @@ mod platform {
     use std::ffi::CString;
 
     pub fn set_wallpaper(path: &str) -> Result<(), String> {
-        let path_c = CString::new(path).map_err(|e| format!("invalid path: {e}"))?;
-
-        unsafe {
-            // NSString *pathNS = [[NSString alloc] initWithUTF8String:path]
-            let alloc: *mut Object = msg_send![class!(NSString), alloc];
-            let path_ns: *mut Object =
-                msg_send![alloc, initWithUTF8String: path_c.as_ptr()];
-
-            // NSURL *url = [NSURL fileURLWithPath:pathNS]
-            let url: *mut Object = msg_send![class!(NSURL), fileURLWithPath: path_ns];
-
-            // NSDictionary *options = [NSDictionary dictionary]  (empty, autoreleased)
-            let options: *mut Object = msg_send![class!(NSDictionary), dictionary];
-
-            // [[NSWorkspace sharedWorkspace] setDesktopImageURL:url forScreen:screen options:options error:nil]
-            let workspace: *mut Object = msg_send![class!(NSWorkspace), sharedWorkspace];
+        // Count attached screens first (fast, no alloc needed)
+        let count: usize = unsafe {
             let screens: *mut Object = msg_send![class!(NSScreen), screens];
-            let count: usize = msg_send![screens, count];
+            msg_send![screens, count]
+        };
 
-            for i in 0usize..count {
-                let screen: *mut Object = msg_send![screens, objectAtIndex: i];
-                let ok: bool = msg_send![
-                    workspace,
-                    setDesktopImageURL: url
-                    forScreen: screen
-                    options: options
-                    error: std::ptr::null_mut::<*mut Object>()
-                ];
-                if !ok {
-                    let _: () = msg_send![path_ns, release];
-                    return Err(format!("setDesktopImageURL failed for screen {}", i));
-                }
-            }
+        if count == 0 {
+            return Err("no screens found".to_string());
+        }
 
-            let _: () = msg_send![path_ns, release];
+        // Spawn one thread per screen so all screens update in parallel.
+        // Each thread creates its own Obj-C objects — no cross-thread sharing.
+        let handles: Vec<_> = (0..count)
+            .map(|i| {
+                let path = path.to_owned();
+                std::thread::spawn(move || -> Result<(), String> {
+                    let path_c = CString::new(path.as_str())
+                        .map_err(|e| format!("invalid path: {e}"))?;
+                    unsafe {
+                        let alloc: *mut Object = msg_send![class!(NSString), alloc];
+                        let path_ns: *mut Object =
+                            msg_send![alloc, initWithUTF8String: path_c.as_ptr()];
+                        let url: *mut Object =
+                            msg_send![class!(NSURL), fileURLWithPath: path_ns];
+                        let options: *mut Object =
+                            msg_send![class!(NSDictionary), dictionary];
+                        let workspace: *mut Object =
+                            msg_send![class!(NSWorkspace), sharedWorkspace];
+                        let screens: *mut Object =
+                            msg_send![class!(NSScreen), screens];
+                        let screen: *mut Object =
+                            msg_send![screens, objectAtIndex: i];
+
+                        let ok: bool = msg_send![
+                            workspace,
+                            setDesktopImageURL: url
+                            forScreen: screen
+                            options: options
+                            error: std::ptr::null_mut::<*mut Object>()
+                        ];
+
+                        let _: () = msg_send![path_ns, release];
+
+                        if ok {
+                            Ok(())
+                        } else {
+                            Err(format!("setDesktopImageURL failed for screen {}", i))
+                        }
+                    }
+                })
+            })
+            .collect();
+
+        for handle in handles {
+            handle
+                .join()
+                .map_err(|_| "wallpaper thread panicked".to_string())??;
         }
 
         Ok(())
