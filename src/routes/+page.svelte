@@ -558,118 +558,73 @@
         queueDragging = false;
     }
 
-    const intervalOptions = [
-        { label: "5 min", value: 5 },
-        { label: "10 min", value: 10 },
-        { label: "15 min", value: 15 },
-        { label: "30 min", value: 30 },
-        { label: "1 hr", value: 60 },
-        { label: "2 hr", value: 120 },
-    ];
 </script>
 
-<div class="layout">
-    <nav class="sidebar">
-        <button
-            class="nav-btn"
-            class:active={activeView.kind === "query"}
-            title="Search"
-            onclick={activateSearch}
-        >
+<div class="flex h-screen w-full bg-base-100 overflow-hidden">
+    <!-- ─── Sidebar ─── -->
+    <nav class="w-[46px] flex-shrink-0 flex flex-col items-center py-2.5 pb-5 gap-1 bg-base-200 shadow-[2px_0_12px_rgba(0,0,0,0.4)] z-10 overflow-y-auto">
+        <button class="nav-btn" class:active={activeView.kind === "query"} title="Search" onclick={activateSearch}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path
-                    d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"
-                />
+                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
             </svg>
         </button>
-        <button
-            class="nav-btn"
-            class:active={activeView.kind === "history"}
-            title="History"
-            onclick={loadHistory}
-        >
+        <button class="nav-btn" class:active={activeView.kind === "history"} title="History" onclick={loadHistory}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path
-                    d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z"
-                />
+                <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 18c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8zm.5-13H11v6l5.2 3.1.8-1.3-4.5-2.7V7z"/>
             </svg>
         </button>
-        <button
-            class="nav-btn"
-            class:active={activeView.kind === "queue"}
-            title="Queue"
-            onclick={activateQueue}
-        >
+        <button class="nav-btn" class:active={activeView.kind === "queue"} title="Queue" onclick={activateQueue}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
                 <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z"/>
             </svg>
         </button>
-        <div class="divider"></div>
+
+        <div class="w-[22px] h-px bg-gradient-to-r from-transparent via-base-content/10 to-transparent my-1"></div>
+
         {#each categories as cat}
-            <button
-                class="nav-btn"
-                class:active={isActive(cat)}
-                title={cat.label}
-                onclick={() => loadSearch(cat.sorting)}
-            >
-                <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                >
-                    <path d={cat.icon} />
+            <button class="nav-btn" class:active={isActive(cat)} title={cat.label} onclick={() => loadSearch(cat.sorting)}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d={cat.icon}/>
                 </svg>
             </button>
         {/each}
 
         {#if collections.length > 0}
-            <div class="divider"></div>
+            <div class="w-[22px] h-px bg-gradient-to-r from-transparent via-base-content/10 to-transparent my-1"></div>
             <button
                 class="nav-btn"
-                class:active={activeView.kind === "collections" ||
-                    activeView.kind === "collection"}
+                class:active={activeView.kind === "collections" || activeView.kind === "collection"}
                 title="Collections"
                 onclick={activateCollections}
             >
-                <svg
-                    viewBox="0 0 24 24"
-                    width="20"
-                    height="20"
-                    fill="currentColor"
-                >
-                    <path
-                        d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"
-                    />
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+                    <path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
                 </svg>
             </button>
         {/if}
-        <div class="spacer"></div>
-        <button
-            class="nav-btn"
-            title="Undo"
-            onclick={undoWallpaper}
-            disabled={undoing}
-        >
+
+        <div class="flex-1"></div>
+
+        <button class="nav-btn" title="Undo" onclick={undoWallpaper} disabled={undoing}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path
-                    d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"
-                />
+                <path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/>
             </svg>
         </button>
         <button class="nav-btn" class:active={activeView.kind === "settings"} title="Settings" onclick={openSettings}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                <path
-                    d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"
-                />
+                <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1112 8.4a3.6 3.6 0 010 7.2z"/>
             </svg>
         </button>
     </nav>
 
-    <main bind:this={mainEl} onscroll={onScroll}>
+    <!-- ─── Main Content ─── -->
+    <main bind:this={mainEl} onscroll={onScroll} class="flex-1 overflow-y-auto min-w-0 bg-gradient-to-b from-base-100 to-base-200/50">
+
+        <!-- Collections picker -->
         {#if activeView.kind === "collections" || activeView.kind === "collection"}
-            <div class="collection-picker">
+            <div class="p-2">
                 <select
+                    class="select select-sm select-bordered w-full bg-base-200 border-base-300"
                     value={selectedCollectionId ?? ""}
                     onchange={(e) => {
                         const val = (e.target as HTMLSelectElement).value;
@@ -678,112 +633,120 @@
                 >
                     <option value="" disabled>Select a collection...</option>
                     {#each collections as col (col.id)}
-                        <option value={col.id}>{col.label} ({col.count})</option
-                        >
+                        <option value={col.id}>{col.label} ({col.count})</option>
                     {/each}
                 </select>
             </div>
         {/if}
+
+        <!-- Search bar -->
         {#if activeView.kind === "query"}
-            <form
-                class="search-bar"
-                onsubmit={(e) => {
-                    e.preventDefault();
-                    searchQuery();
-                }}
-            >
+            <form class="p-2" onsubmit={(e) => { e.preventDefault(); searchQuery(); }}>
                 <input
                     type="text"
+                    class="input input-sm input-bordered w-full bg-base-200 border-base-300 placeholder:text-base-content/25 focus:outline-none focus:border-primary"
                     bind:value={searchInput}
                     placeholder="Search wallpapers..."
                 />
             </form>
         {/if}
+
         {#if activeView.kind === "settings"}
-            <div class="settings-panel">
-                <h3 class="settings-title">Settings</h3>
-                <form class="settings-form" onsubmit={(e) => { e.preventDefault(); saveSettings(); }}>
-                    <label class="settings-label">
-                        <span class="settings-label-text">Username</span>
-                        <input type="text" class="settings-input" bind:value={settingsUsername} placeholder="wallhaven username" />
-                    </label>
-                    <label class="settings-label">
-                        <span class="settings-label-text">API Key</span>
-                        <input type="password" class="settings-input" bind:value={settingsApiKey} placeholder="wallhaven API key" />
-                    </label>
-                    <div class="settings-field">
-                        <span class="settings-label-text">Categories</span>
-                        <div class="settings-toggle-group">
-                            <button type="button" class="settings-toggle category" class:active={settingsGeneral} onclick={() => (settingsGeneral = !settingsGeneral)}>General</button>
-                            <button type="button" class="settings-toggle category" class:active={settingsAnime} onclick={() => (settingsAnime = !settingsAnime)}>Anime</button>
-                            <button type="button" class="settings-toggle category" class:active={settingsPeople} onclick={() => (settingsPeople = !settingsPeople)}>People</button>
+            <!-- ─── Settings ─── -->
+            <div class="p-[18px] h-full box-border overflow-y-auto">
+                <h3 class="mt-0 mb-4 text-[15px] font-semibold text-base-content tracking-[0.3px]">Settings</h3>
+                <form class="flex flex-col gap-3.5" onsubmit={(e) => { e.preventDefault(); saveSettings(); }}>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Username</span>
+                        <input type="text" class="input input-sm input-bordered bg-base-200 border-base-300 placeholder:text-base-content/20" bind:value={settingsUsername} placeholder="wallhaven username" />
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">API Key</span>
+                        <input type="password" class="input input-sm input-bordered bg-base-200 border-base-300 placeholder:text-base-content/20" bind:value={settingsApiKey} placeholder="wallhaven API key" />
+                    </div>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Categories</span>
+                        <div class="join w-full">
+                            <button type="button"
+                                class="join-item btn btn-sm flex-1 border-base-300 {settingsGeneral ? 'bg-info/20 text-info border-info/40' : 'bg-base-200 text-base-content/30'}"
+                                onclick={() => (settingsGeneral = !settingsGeneral)}>General</button>
+                            <button type="button"
+                                class="join-item btn btn-sm flex-1 border-base-300 {settingsAnime ? 'bg-info/20 text-info border-info/40' : 'bg-base-200 text-base-content/30'}"
+                                onclick={() => (settingsAnime = !settingsAnime)}>Anime</button>
+                            <button type="button"
+                                class="join-item btn btn-sm flex-1 border-base-300 {settingsPeople ? 'bg-info/20 text-info border-info/40' : 'bg-base-200 text-base-content/30'}"
+                                onclick={() => (settingsPeople = !settingsPeople)}>People</button>
                         </div>
                     </div>
-                    <div class="settings-field">
-                        <span class="settings-label-text">Purity</span>
-                        <div class="settings-toggle-group">
-                            <button type="button" class="settings-toggle sfw" class:active={settingsSfw} onclick={() => (settingsSfw = !settingsSfw)}>SFW</button>
-                            <button type="button" class="settings-toggle sketchy" class:active={settingsSketchy} onclick={() => (settingsSketchy = !settingsSketchy)}>Sketchy</button>
-                            <button type="button" class="settings-toggle nsfw" class:active={settingsNsfw} onclick={() => (settingsNsfw = !settingsNsfw)}>NSFW</button>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Purity</span>
+                        <div class="join w-full">
+                            <button type="button"
+                                class="join-item btn btn-sm flex-1 border-base-300 {settingsSfw ? 'bg-success/20 text-success border-success/40' : 'bg-base-200 text-base-content/30'}"
+                                onclick={() => (settingsSfw = !settingsSfw)}>SFW</button>
+                            <button type="button"
+                                class="join-item btn btn-sm flex-1 border-base-300 {settingsSketchy ? 'bg-warning/20 text-warning border-warning/40' : 'bg-base-200 text-base-content/30'}"
+                                onclick={() => (settingsSketchy = !settingsSketchy)}>Sketchy</button>
+                            <button type="button"
+                                class="join-item btn btn-sm flex-1 border-base-300 {settingsNsfw ? 'bg-error/20 text-error border-error/40' : 'bg-base-200 text-base-content/30'}"
+                                onclick={() => (settingsNsfw = !settingsNsfw)}>NSFW</button>
                         </div>
                     </div>
-                    <label class="settings-label">
-                        <span class="settings-label-text">Minimum Resolution</span>
-                        <select class="settings-input" bind:value={settingsAtleast}>
+                    <div class="flex flex-col gap-1">
+                        <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Minimum Resolution</span>
+                        <select class="select select-sm select-bordered bg-base-200 border-base-300" bind:value={settingsAtleast}>
                             <option value="">Any</option>
                             {#each availableResolutions as res}
                                 <option value={res}>{res}</option>
                             {/each}
                         </select>
-                    </label>
-                    <button class="settings-save" type="submit">Save</button>
+                    </div>
+                    <button class="btn btn-primary btn-sm mt-1" type="submit">Save</button>
                 </form>
-                <div class="settings-danger">
-                    <button class="settings-clear-history" onclick={clearHistory}>Clear History</button>
+                <div class="mt-3.5 pt-3.5 border-t border-base-300">
+                    <button class="btn btn-error btn-outline btn-sm w-full" onclick={clearHistory}>Clear History</button>
                 </div>
             </div>
+
         {:else if activeView.kind === "queue"}
-            <div class="queue-view">
-                <div class="queue-controls">
+            <!-- ─── Queue ─── -->
+            <div class="flex flex-col h-full">
+                <div class="flex items-center gap-2.5 px-2.5 py-2 border-b border-base-300 flex-shrink-0">
                     <button
-                        class="queue-play-btn"
-                        class:running={queueRunning}
+                        class="btn btn-sm flex-shrink-0 gap-1.5 {queueRunning ? 'btn-error' : 'btn-primary'}"
                         onclick={() => queueRunning ? stopCycling() : startCycling()}
                         disabled={queue.length === 0}
                         title={queueRunning ? "Stop cycling" : "Start cycling"}
                     >
                         {#if queueRunning}
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                             Stop
                         {:else}
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                <path d="M8 5v14l11-7z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
                             Start
                         {/if}
                     </button>
-                    <div class="queue-interval">
-                        <span class="queue-interval-label">Cycle every</span>
-                        <div class="queue-interval-pills">
-                            {#each intervalOptions as opt}
-                                <button
-                                    class="queue-interval-pill"
-                                    class:active={queueIntervalMinutes === opt.value}
-                                    onclick={() => changeQueueInterval(opt.value)}
-                                >{opt.label}</button>
-                            {/each}
-                        </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-[10px] text-base-content/40 whitespace-nowrap">Every</span>
+                        <input
+                            type="number"
+                            class="input input-xs input-bordered w-14 bg-base-200 border-base-300 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            min="1"
+                            max="1440"
+                            bind:value={queueIntervalMinutes}
+                            onchange={() => { if (queueIntervalMinutes > 0) changeQueueInterval(queueIntervalMinutes); }}
+                        />
+                        <span class="text-[10px] text-base-content/40 whitespace-nowrap">min</span>
                     </div>
                 </div>
+
                 {#if queue.length === 0}
-                    <p class="status">Queue is empty — add wallpapers from search views</p>
+                    <p class="text-center py-6 text-base-content/40 text-xs animate-pulse">Queue is empty — add wallpapers from search views</p>
                 {:else}
-                    <div class="grid" class:dragging={queueDragging}>
+                    <div class="grid grid-cols-3 gap-1.5 p-1.5" class:dragging={queueDragging}>
                         {#each queue as wp, idx (wp.id)}
                             <div
-                                class="thumb-wrapper"
+                                class="thumb-wrapper group relative overflow-hidden rounded-lg transition-all duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                                 class:setting={settingWallpaper === wp.id}
                                 class:queue-active={idx === queueIndex % queue.length && queueRunning}
                                 class:drag-source={queueDragging && dragFromIndex === idx}
@@ -791,142 +754,173 @@
                                 data-queue-idx={idx}
                             >
                                 <button
-                                    class="thumb"
+                                    class="thumb w-full border-0 p-0 bg-transparent block cursor-pointer disabled:cursor-default disabled:opacity-50"
                                     onclick={() => applyWallpaper(wp)}
                                     disabled={settingWallpaper !== ""}
                                 >
-                                    <img src={wp.thumbs.small} alt={wp.id} />
+                                    <img src={wp.thumbs.small} alt={wp.id} class="w-full block" />
                                     {#if settingWallpaper === wp.id}
-                                        <span class="applying">...</span>
+                                        <span class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                                            <span class="loading loading-spinner loading-sm text-white"></span>
+                                        </span>
                                     {/if}
                                 </button>
                                 <button
-                                    class="delete-icon"
+                                    class="absolute top-1.5 left-1.5 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-error opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-error/70 hover:text-white transition-all duration-200"
                                     onclick={(e) => { e.stopPropagation(); removeFromQueue(wp); }}
                                     title="Remove from queue"
                                 >
-                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                    </svg>
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                                 </button>
                                 <!-- svelte-ignore a11y_no_static_element_interactions -->
                                 <div
-                                    class="drag-handle"
+                                    class="drag-handle absolute top-1.5 right-1.5 w-[22px] h-[22px] flex items-center justify-center rounded-md bg-black/45 backdrop-blur-[8px] text-white/60 cursor-grab opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-primary/50 hover:text-white transition-all duration-200"
                                     title="Drag to reorder"
                                     onmousedown={(e) => onDragHandleMouseDown(e, idx)}
                                 >
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
-                                        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
-                                    </svg>
+                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
                                 </div>
                             </div>
                         {/each}
                     </div>
-                    <div class="queue-footer">
-                        <button class="queue-clear-btn" onclick={clearQueue}>Clear Queue</button>
+                    <div class="flex justify-center px-2.5 py-2 flex-shrink-0">
+                        <button class="btn btn-error btn-outline btn-xs" onclick={clearQueue}>Clear Queue</button>
                     </div>
                 {/if}
             </div>
+
         {:else if loading}
-            <p class="status error">{error}</p>
+            <div class="flex justify-center py-8">
+                <span class="loading loading-spinner loading-md text-primary"></span>
+            </div>
+
+        {:else if error}
+            <p class="text-center py-6 text-error text-xs">{error}</p>
+
         {:else if wallpapers.length === 0}
-            <p class="status">No wallpapers found</p>
+            <p class="text-center py-6 text-base-content/40 text-xs">No wallpapers found</p>
+
         {:else}
-            <div class="grid">
+            <div class="grid grid-cols-3 gap-1.5 p-1.5">
                 {#each wallpapers as wp (wp.id)}
                     <div
-                        class="thumb-wrapper"
+                        class="thumb-wrapper group relative overflow-hidden rounded-lg transition-all duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                         class:setting={settingWallpaper === wp.id}
                     >
                         <button
-                            class="thumb"
+                            class="thumb w-full border-0 p-0 bg-transparent block cursor-pointer disabled:cursor-default disabled:opacity-50"
                             onclick={() => applyWallpaper(wp)}
                             disabled={settingWallpaper !== ""}
                         >
-                            <img src={wp.thumbs.small} alt={wp.id} />
-
+                            <img src={wp.thumbs.small} alt={wp.id} class="w-full block transition-[filter] duration-300" />
                             {#if settingWallpaper === wp.id}
-                                <span class="applying">...</span>
+                                <span class="absolute inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                                    <span class="loading loading-spinner loading-sm text-white"></span>
+                                </span>
                             {/if}
                         </button>
+
+                        <!-- Preview icon (top-right) -->
                         <button
-                            class="preview-icon"
+                            class="absolute top-1.5 right-1.5 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-white/85 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-primary/60 hover:text-white transition-all duration-200"
                             onclick={() => openPreview(wp)}
                             title="Preview"
                         >
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                            </svg>
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                         </button>
+
+                        <!-- Queue icon (bottom-left) -->
                         <button
-                            class="queue-icon"
+                            class="queue-icon absolute bottom-1.5 left-1.5 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-white/85 transition-all duration-200"
                             class:in-queue={queue.some((q) => q.id === wp.id)}
                             onclick={(e) => { e.stopPropagation(); toggleQueue(wp); }}
                             title={queue.some((q) => q.id === wp.id) ? "Remove from queue" : "Add to queue"}
                         >
                             {#if queue.some((q) => q.id === wp.id)}
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                </svg>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                             {:else}
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/>
-                                </svg>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M14 10H2v2h12v-2zm0-4H2v2h12V6zm4 8v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM2 16h8v-2H2v2z"/></svg>
                             {/if}
                         </button>
+
+                        <!-- Delete icon (history view only, top-left) -->
                         {#if activeView.kind === "history"}
                             <button
-                                class="delete-icon"
+                                class="absolute top-1.5 left-1.5 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-error opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-error/70 hover:text-white transition-all duration-200"
                                 onclick={(e) => { e.stopPropagation(); deleteHistoryEntry(wp); }}
                                 title="Remove from history"
                             >
-                                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                </svg>
+                                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
                             </button>
                         {/if}
                     </div>
                 {/each}
             </div>
             {#if loadingMore}
-                <p class="status">Loading more...</p>
+                <div class="flex justify-center py-3">
+                    <span class="loading loading-spinner loading-sm text-primary"></span>
+                </div>
             {/if}
         {/if}
     </main>
 </div>
 
+<!-- ─── Preview Modal ─── -->
 {#if previewWallpaper}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
-    <div class="preview-overlay" onclick={() => (previewWallpaper = null)} onkeydown={(e) => { if (e.key === 'Escape') previewWallpaper = null; }}>
+    <div
+        class="fixed inset-0 bg-black/80 backdrop-blur-[16px] flex items-center justify-center z-[100] animate-[fadeIn_0.2s_ease-out]"
+        onclick={() => (previewWallpaper = null)}
+        onkeydown={(e) => { if (e.key === 'Escape') previewWallpaper = null; }}
+    >
         <!-- svelte-ignore a11y_no_static_element_interactions -->
         <!-- svelte-ignore a11y_click_events_have_key_events -->
-        <div class="preview-content" onclick={(e) => e.stopPropagation()}>
-            <button class="preview-close" onclick={() => (previewWallpaper = null)} title="Close">
-                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                </svg>
+        <div
+            class="relative max-w-[90%] max-h-[90%] flex flex-col items-center gap-3 animate-[fadeIn_0.25s_ease-out]"
+            onclick={(e) => e.stopPropagation()}
+        >
+            <button
+                class="absolute -top-2 -right-2 w-7 h-7 flex items-center justify-center rounded-full border-0 p-0 cursor-pointer z-10 bg-white/10 backdrop-blur-[8px] text-white hover:bg-white/25 hover:scale-110 active:scale-95 transition-all duration-200"
+                onclick={() => (previewWallpaper = null)}
+                title="Close"
+            >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
             </button>
-            <img class="preview-image" src={previewWallpaper.thumbs.large} alt={previewWallpaper.id} />
-            {#if previewTags.length > 0}
-                <div class="preview-tags">
+
+            <img
+                class="max-w-[480px] max-h-[70vh] rounded-xl object-contain shadow-[0_8px_40px_rgba(0,0,0,0.5)]"
+                src={previewWallpaper.thumbs.large}
+                alt={previewWallpaper.id}
+            />
+
+            {#if loadingTags}
+                <p class="text-[11px] text-base-content/30 animate-pulse">Loading tags...</p>
+            {:else if previewTags.length > 0}
+                <div class="flex flex-wrap gap-1 max-w-[480px] justify-center">
                     {#each previewTags as tag (tag.id)}
-                        <button class="tag-pill" onclick={() => searchTag(tag)}>{tag.name}</button>
+                        <button
+                            class="px-3 py-1 rounded-full border border-white/10 bg-white/[0.06] text-base-content/55 text-[11px] cursor-pointer transition-all duration-200 hover:bg-primary/15 hover:border-primary/40 hover:text-primary-content hover:scale-105"
+                            onclick={() => searchTag(tag)}
+                        >{tag.name}</button>
                     {/each}
                 </div>
-            {:else if loadingTags}
-                <div class="preview-tags-loading">Loading tags...</div>
             {/if}
-            <div class="preview-actions">
-                <span class="preview-resolution">{previewWallpaper.resolution}</span>
-                <button class="preview-similar" onclick={() => searchSimilar(previewWallpaper!)} title="Find Similar">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                        <path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/>
-                    </svg>
+
+            <div class="flex items-center gap-2.5">
+                <span class="text-base-content/40 text-xs font-medium">{previewWallpaper.resolution}</span>
+                <button
+                    class="w-9 h-9 flex items-center justify-center rounded-full border border-white/[0.12] bg-white/[0.04] text-base-content/55 cursor-pointer p-0 hover:bg-white/10 hover:border-white/25 hover:scale-110 active:scale-95 transition-all duration-200"
+                    onclick={() => searchSimilar(previewWallpaper!)}
+                    title="Find Similar"
+                >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
                 </button>
-                <button class="preview-apply" onclick={() => { applyWallpaper(previewWallpaper!); previewWallpaper = null; }} title="Apply Wallpaper">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                    </svg>
+                <button
+                    class="w-9 h-9 flex items-center justify-center rounded-full border-0 bg-primary text-primary-content cursor-pointer p-0 shadow-[0_2px_12px_oklch(var(--p)/0.3)] hover:scale-110 hover:shadow-[0_4px_20px_oklch(var(--p)/0.5)] active:scale-95 transition-all duration-200"
+                    onclick={() => { applyWallpaper(previewWallpaper!); previewWallpaper = null; }}
+                    title="Apply Wallpaper"
+                >
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
                 </button>
             </div>
         </div>
@@ -939,99 +933,51 @@
         to { opacity: 1; }
     }
 
-    @keyframes pulse {
-        0%, 100% { opacity: 0.5; }
-        50% { opacity: 1; }
-    }
-
-    @keyframes shimmer {
-        0% { background-position: -200% center; }
-        100% { background-position: 200% center; }
-    }
-
     :global(body) {
         overflow: hidden;
     }
 
-    :root {
-        margin: 0;
-        padding: 0;
-        font-family:
-            -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 12px;
-        color: #f0f0f0;
-        background-color: #161618;
-    }
-
-    /* Custom scrollbar */
-    :global(::-webkit-scrollbar) {
-        width: 6px;
-    }
-    :global(::-webkit-scrollbar-track) {
-        background: transparent;
-    }
-    :global(::-webkit-scrollbar-thumb) {
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 3px;
-    }
-    :global(::-webkit-scrollbar-thumb:hover) {
-        background: rgba(255, 255, 255, 0.2);
-    }
-
-    .layout {
-        display: flex;
-        height: 100vh;
-        width: 100%;
-        background-color: #161618;
-    }
-
-    /* ─── Sidebar ─── */
-    .sidebar {
-        width: 46px;
-        flex-shrink: 0;
-        background: linear-gradient(180deg, #0e0e10 0%, #131316 100%);
-        box-shadow: 2px 0 12px rgba(0, 0, 0, 0.4);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding: 10px 0 20px;
-        gap: 4px;
-        overflow-y: auto;
-        z-index: 2;
-    }
-
+    /* Nav button — needs position:relative for ::before and custom transitions */
     .nav-btn {
+        position: relative;
         width: 34px;
         height: 34px;
         border: none;
         border-radius: 8px;
         background: transparent;
-        color: #5a5a66;
+        color: oklch(var(--bc) / 0.3);
         cursor: pointer;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 0;
-        position: relative;
-        transition:
-            background 0.2s ease-out,
-            color 0.2s ease-out,
-            transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-            box-shadow 0.2s ease-out;
+        transition: background 0.2s ease-out, color 0.2s ease-out,
+            transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease-out;
     }
 
     .nav-btn:hover {
         background: rgba(255, 255, 255, 0.06);
-        color: #b0b0c0;
+        color: oklch(var(--bc) / 0.7);
         transform: scale(1.08);
     }
 
-    .nav-btn.active {
-        background: rgba(100, 108, 255, 0.12);
-        color: #8b8fff;
-        box-shadow: 0 0 12px rgba(100, 108, 255, 0.15);
+    .nav-btn:active {
+        transform: scale(0.95);
     }
 
+    .nav-btn:disabled {
+        opacity: 0.35;
+        cursor: default;
+        transform: none !important;
+    }
+
+    .nav-btn.active {
+        background: oklch(var(--p) / 0.12);
+        color: oklch(var(--p) / 0.85);
+        box-shadow: 0 0 12px oklch(var(--p) / 0.15);
+    }
+
+    /* Left accent bar on active nav item */
     .nav-btn.active::before {
         content: '';
         position: absolute;
@@ -1040,581 +986,26 @@
         transform: translateY(-50%);
         width: 3px;
         height: 18px;
-        background: #646cff;
+        background: oklch(var(--p));
         border-radius: 0 3px 3px 0;
     }
 
-    .nav-btn:active {
-        transform: scale(0.95);
-    }
-
-    .divider {
-        width: 22px;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
-        margin: 6px 0;
-    }
-
-    .spacer {
-        flex: 1;
-    }
-
-    /* ─── Main Content ─── */
-    main {
-        flex: 1;
-        overflow-y: auto;
-        min-width: 0;
-        background: linear-gradient(180deg, #161618 0%, #1a1a1e 100%);
-    }
-
-    /* ─── Inputs (shared) ─── */
-    .collection-picker {
-        padding: 8px;
-    }
-
-    .collection-picker select {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 8px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.04);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
-        color: #e0e0e8;
-        font-size: 12px;
-        outline: none;
-        transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
-    }
-
-    .collection-picker select:focus {
-        border-color: rgba(100, 108, 255, 0.5);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(100, 108, 255, 0.1);
-    }
-
-    .collection-picker select option {
-        background: #1e1e22;
-        color: #e0e0e8;
-    }
-
-    .search-bar {
-        padding: 8px;
-    }
-
-    .search-bar input {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 8px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 8px;
-        background: rgba(255, 255, 255, 0.04);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
-        color: #e0e0e8;
-        font-size: 12px;
-        outline: none;
-        transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
-    }
-
-    .search-bar input:focus {
-        border-color: rgba(100, 108, 255, 0.5);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(100, 108, 255, 0.1);
-    }
-
-    .search-bar input::placeholder {
-        color: #555;
-    }
-
-    /* ─── Status Messages ─── */
-    .status {
-        text-align: center;
-        padding: 24px;
-        color: #666;
-        animation: pulse 1.8s ease-in-out infinite;
-    }
-
-    .error {
-        color: #ff6b6b;
-        animation: none;
-    }
-
-    /* ─── Wallpaper Grid ─── */
-    .grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 6px;
-        padding: 6px;
-    }
-
-    .thumb-wrapper {
-        position: relative;
-        overflow: hidden;
-        border-radius: 8px;
-        transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease-out;
-    }
-
+    /* Thumb hover effects — group-hover in Tailwind handles siblings,
+       but the filter on img and scale on wrapper need CSS for specificity */
     .thumb-wrapper:hover {
         transform: scale(1.03);
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
         z-index: 1;
     }
 
-    .thumb {
-        width: 100%;
-        cursor: pointer;
-        border: none;
-        padding: 0;
-        background: none;
-        display: block;
-    }
-
-    .thumb img {
-        width: 100%;
-        display: block;
-        transition: filter 0.3s ease-out;
-    }
-
     .thumb-wrapper:hover .thumb img {
         filter: brightness(1.1) saturate(1.15);
     }
 
-    .thumb:hover:not(:disabled) {
-        opacity: 1;
-    }
-
-    .thumb:disabled {
-        cursor: default;
-        opacity: 0.5;
-    }
-
-    .thumb-wrapper.setting .thumb {
-        opacity: 1;
-    }
-
-    .applying {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(0, 0, 0, 0.6);
-        backdrop-filter: blur(2px);
-        color: #fff;
-        font-size: 14px;
-        font-weight: bold;
-        animation: pulse 1.2s ease-in-out infinite;
-    }
-
-    .preview-icon {
-        position: absolute;
-        top: 6px;
-        right: 6px;
-        width: 26px;
-        height: 26px;
-        border: none;
-        border-radius: 8px;
-        background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(8px);
-        color: rgba(255, 255, 255, 0.85);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        opacity: 0;
-        transform: translateY(-4px);
-        transition: opacity 0.2s ease-out, transform 0.2s ease-out, background 0.2s ease-out;
-    }
-
-    .preview-icon:hover {
-        background: rgba(100, 108, 255, 0.6);
-        color: #fff;
-    }
-
-    .thumb-wrapper:hover .preview-icon,
-    .thumb-wrapper:hover .delete-icon {
-        opacity: 1;
-        transform: translateY(0);
-    }
-
-    .delete-icon {
-        position: absolute;
-        top: 6px;
-        left: 6px;
-        width: 26px;
-        height: 26px;
-        border: none;
-        border-radius: 8px;
-        background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(8px);
-        color: #ff6b6b;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        opacity: 0;
-        transform: translateY(-4px);
-        transition: opacity 0.2s ease-out, transform 0.2s ease-out, background 0.2s ease-out;
-    }
-
-    .delete-icon:hover {
-        background: rgba(255, 60, 60, 0.7);
-        color: #fff;
-    }
-
-    /* ─── Preview Modal ─── */
-    .preview-overlay {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(16px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 100;
-        animation: fadeIn 0.2s ease-out;
-    }
-
-    .preview-content {
-        position: relative;
-        max-width: 90%;
-        max-height: 90%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 12px;
-        animation: fadeIn 0.25s ease-out;
-    }
-
-    .preview-close {
-        position: absolute;
-        top: -8px;
-        right: -8px;
-        width: 28px;
-        height: 28px;
-        border: none;
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.1);
-        backdrop-filter: blur(8px);
-        color: #fff;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        z-index: 1;
-        transition: background 0.2s ease-out, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .preview-close:hover {
-        background: rgba(255, 255, 255, 0.25);
-        transform: scale(1.1);
-    }
-
-    .preview-image {
-        max-width: 538px;
-        max-height: 70vh;
-        border-radius: 10px;
-        object-fit: contain;
-        box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
-    }
-
-    .preview-tags {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-        max-width: 538px;
-        justify-content: center;
-    }
-
-    .preview-tags-loading {
-        color: #555;
-        font-size: 11px;
-        animation: pulse 1.8s ease-in-out infinite;
-    }
-
-    .tag-pill {
-        padding: 4px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.06);
-        color: #aaa;
-        font-size: 11px;
-        cursor: pointer;
-        transition:
-            background 0.2s ease-out,
-            border-color 0.2s ease-out,
-            color 0.2s ease-out,
-            transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    .tag-pill:hover {
-        background: rgba(100, 108, 255, 0.15);
-        border-color: rgba(100, 108, 255, 0.4);
-        color: #c8caff;
-        transform: scale(1.05);
-    }
-
-    .preview-actions {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-    }
-
-    .preview-resolution {
-        color: #666;
-        font-size: 12px;
-        font-weight: 500;
-    }
-
-    .preview-similar {
-        width: 36px;
-        height: 36px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.04);
-        color: #aaa;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        transition:
-            background 0.2s ease-out,
-            border-color 0.2s ease-out,
-            transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-            box-shadow 0.2s ease-out;
-    }
-
-    .preview-similar:hover {
-        background: rgba(255, 255, 255, 0.1);
-        border-color: rgba(255, 255, 255, 0.25);
-        transform: scale(1.1);
-        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .preview-apply {
-        width: 36px;
-        height: 36px;
-        border: none;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #646cff 0%, #535bf2 100%);
-        color: #fff;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
-        transition:
-            transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-            box-shadow 0.2s ease-out;
-        box-shadow: 0 2px 12px rgba(100, 108, 255, 0.3);
-    }
-
-    .preview-apply:hover {
-        transform: scale(1.1);
-        box-shadow: 0 4px 20px rgba(100, 108, 255, 0.5);
-    }
-
-    .preview-apply:active {
-        transform: scale(0.95);
-    }
-
-    /* ─── Settings Panel ─── */
-    .settings-panel {
-        padding: 18px;
-        overflow-y: auto;
-        height: 100%;
-        box-sizing: border-box;
-    }
-
-    .settings-title {
-        margin: 0 0 16px 0;
-        font-size: 15px;
-        font-weight: 600;
-        color: #e0e0e8;
-        letter-spacing: 0.3px;
-    }
-
-    .settings-form {
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-    }
-
-    .settings-label {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-
-    .settings-label-text {
-        font-weight: 600;
-        font-size: 10px;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-    }
-
-    .settings-field {
-        display: flex;
-        flex-direction: column;
-        gap: 5px;
-    }
-
-    .settings-input {
-        padding: 8px 12px;
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 8px;
-        font-size: 12px;
-        background: rgba(255, 255, 255, 0.04);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
-        color: #e0e0e8;
-        outline: none;
-        transition: border-color 0.2s ease-out, box-shadow 0.2s ease-out;
-    }
-
-    .settings-input:focus {
-        border-color: rgba(100, 108, 255, 0.5);
-        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 3px rgba(100, 108, 255, 0.1);
-    }
-
-    .settings-input::placeholder {
-        color: #444;
-    }
-
-    .settings-input option {
-        background: #1e1e22;
-        color: #e0e0e8;
-    }
-
-    .settings-toggle-group {
-        display: flex;
-        gap: 6px;
-    }
-
-    .settings-toggle {
-        flex: 1;
-        padding: 7px 10px;
-        border: 1px solid rgba(255, 255, 255, 0.06);
-        border-radius: 8px;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.2s ease-out, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
-        color: #555;
-        background: rgba(255, 255, 255, 0.03);
-    }
-
-    .settings-toggle:hover {
-        background: rgba(255, 255, 255, 0.06);
-        color: #888;
-    }
-
-    .settings-toggle:active {
-        transform: scale(0.96);
-    }
-
-    .settings-toggle.sfw.active {
-        background: linear-gradient(135deg, #3d6b35 0%, #2d5227 100%);
-        color: #c8e6bf;
-        border-color: rgba(90, 125, 79, 0.6);
-        box-shadow: 0 0 10px rgba(74, 103, 65, 0.2);
-    }
-
-    .settings-toggle.sketchy.active {
-        background: linear-gradient(135deg, #7a6a2a 0%, #5e5220 100%);
-        color: #e6ddb3;
-        border-color: rgba(158, 141, 66, 0.6);
-        box-shadow: 0 0 10px rgba(138, 122, 58, 0.2);
-    }
-
-    .settings-toggle.nsfw.active {
-        background: linear-gradient(135deg, #6b2a2a 0%, #521e1e 100%);
-        color: #e6b3b3;
-        border-color: rgba(158, 66, 66, 0.6);
-        box-shadow: 0 0 10px rgba(122, 58, 58, 0.2);
-    }
-
-    .settings-toggle.category.active {
-        background: linear-gradient(135deg, #2a4a6b 0%, #1e3852 100%);
-        color: #b3d4e6;
-        border-color: rgba(66, 120, 160, 0.6);
-        box-shadow: 0 0 10px rgba(58, 90, 122, 0.2);
-    }
-
-    .settings-save {
-        margin-top: 6px;
-        padding: 9px 18px;
-        border: none;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #646cff 0%, #535bf2 100%);
-        color: #fff;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease-out;
-        box-shadow: 0 2px 12px rgba(100, 108, 255, 0.25);
-    }
-
-    .settings-save:hover {
-        box-shadow: 0 4px 20px rgba(100, 108, 255, 0.4);
-        background-size: 200% auto;
-    }
-
-    .settings-save:active {
-        transform: scale(0.97);
-    }
-
-    .settings-danger {
-        margin-top: 14px;
-        padding-top: 14px;
-        border-top: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .settings-clear-history {
-        width: 100%;
-        padding: 9px 18px;
-        border: 1px solid rgba(158, 66, 66, 0.4);
-        border-radius: 8px;
-        background: rgba(122, 58, 58, 0.1);
-        color: #d4a0a0;
-        font-size: 12px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.2s ease-out, border-color 0.2s ease-out, box-shadow 0.2s ease-out;
-    }
-
-    .settings-clear-history:hover {
-        background: rgba(122, 58, 58, 0.25);
-        border-color: rgba(158, 66, 66, 0.6);
-        box-shadow: 0 0 12px rgba(158, 66, 66, 0.15);
-    }
-
-    /* ─── Queue View ─── */
+    /* Queue icon — hidden by default, visible on hover and when in-queue */
     .queue-icon {
-        position: absolute;
-        bottom: 6px;
-        left: 6px;
-        width: 26px;
-        height: 26px;
-        border: none;
-        border-radius: 8px;
-        background: rgba(0, 0, 0, 0.5);
-        backdrop-filter: blur(8px);
-        color: rgba(255, 255, 255, 0.85);
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 0;
         opacity: 0;
         transform: translateY(4px);
-        transition: opacity 0.2s ease-out, transform 0.2s ease-out, background 0.2s ease-out;
-    }
-
-    .queue-icon:hover {
-        background: rgba(80, 200, 120, 0.6);
-        color: #fff;
     }
 
     .queue-icon.in-queue {
@@ -1629,121 +1020,24 @@
         transform: translateY(0);
     }
 
-    .queue-view {
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-    }
-
-    .queue-controls {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 10px 6px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-        flex-shrink: 0;
-    }
-
-    .queue-play-btn {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        padding: 6px 12px;
-        border: none;
-        border-radius: 8px;
-        background: linear-gradient(135deg, #646cff 0%, #535bf2 100%);
-        color: #fff;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: box-shadow 0.2s ease-out, transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
-        white-space: nowrap;
-        flex-shrink: 0;
-        box-shadow: 0 2px 10px rgba(100, 108, 255, 0.25);
-    }
-
-    .queue-play-btn.running {
-        background: linear-gradient(135deg, #ff6b6b 0%, #ee4444 100%);
-        box-shadow: 0 2px 10px rgba(255, 80, 80, 0.25);
-    }
-
-    .queue-play-btn:disabled {
-        opacity: 0.4;
-        cursor: default;
-    }
-
-    .queue-play-btn:not(:disabled):hover {
-        box-shadow: 0 4px 16px rgba(100, 108, 255, 0.4);
-        transform: scale(1.03);
-    }
-
-    .queue-play-btn.running:not(:disabled):hover {
-        box-shadow: 0 4px 16px rgba(255, 80, 80, 0.4);
-    }
-
-    .queue-interval {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        flex: 1;
-        min-width: 0;
-    }
-
-    .queue-interval-label {
-        font-size: 10px;
-        color: rgba(255, 255, 255, 0.4);
-        white-space: nowrap;
-        flex-shrink: 0;
-    }
-
-    .queue-interval-pills {
-        display: flex;
-        gap: 3px;
-        flex-wrap: wrap;
-    }
-
-    .queue-interval-pill {
-        padding: 3px 7px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 6px;
-        background: rgba(255, 255, 255, 0.05);
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 10px;
-        cursor: pointer;
-        transition: background 0.15s ease-out, color 0.15s ease-out, border-color 0.15s ease-out;
-    }
-
-    .queue-interval-pill:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: rgba(255, 255, 255, 0.8);
-    }
-
-    .queue-interval-pill.active {
-        background: rgba(100, 108, 255, 0.25);
-        border-color: rgba(100, 108, 255, 0.5);
-        color: #b0b4ff;
-    }
-
+    /* Queue drag states */
     .thumb-wrapper.queue-active {
-        box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.8), 0 0 16px rgba(100, 108, 255, 0.4);
+        box-shadow: 0 0 0 2px oklch(var(--p) / 0.8), 0 0 16px oklch(var(--p) / 0.4);
     }
 
-    /* Item being dragged — looks lifted/ghosted */
     .thumb-wrapper.drag-source {
         opacity: 0.35;
         transform: scale(0.93);
-        box-shadow: 0 0 0 2px rgba(100, 108, 255, 0.5), 0 8px 24px rgba(0, 0, 0, 0.6);
+        box-shadow: 0 0 0 2px oklch(var(--p) / 0.5), 0 8px 24px rgba(0, 0, 0, 0.6);
         z-index: 0;
     }
 
-    /* Drop target — bright accent ring + scale */
     .thumb-wrapper.drag-over {
-        box-shadow: 0 0 0 2px #646cff, 0 0 20px rgba(100, 108, 255, 0.55);
+        box-shadow: 0 0 0 2px oklch(var(--p)), 0 0 20px oklch(var(--p) / 0.55);
         transform: scale(1.06);
         z-index: 2;
     }
 
-    /* All other items dim during drag */
     .grid.dragging .thumb-wrapper:not(.drag-over):not(.drag-source) {
         opacity: 0.55;
         transform: none;
@@ -1755,67 +1049,15 @@
         cursor: grabbing;
     }
 
-    .drag-handle {
-        position: absolute;
-        top: 6px;
-        right: 6px;
-        width: 22px;
-        height: 22px;
-        border-radius: 6px;
-        background: rgba(0, 0, 0, 0.45);
-        backdrop-filter: blur(8px);
-        color: rgba(255, 255, 255, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: grab;
-        opacity: 0;
-        transform: translateY(-4px);
-        transition: opacity 0.2s ease-out, transform 0.2s ease-out, background 0.15s ease-out;
-    }
-
-    .drag-handle:hover {
-        background: rgba(100, 108, 255, 0.5);
-        color: #fff;
-    }
-
-    .thumb-wrapper:hover .drag-handle,
+    /* Show all drag handles while dragging, style active source handle */
     .grid.dragging .drag-handle {
         opacity: 1;
         transform: translateY(0);
     }
 
-    .grid.dragging .drag-source .drag-handle {
-        background: rgba(100, 108, 255, 0.7);
+    .grid.dragging .thumb-wrapper.drag-source .drag-handle {
+        background: oklch(var(--p) / 0.7);
         color: #fff;
-        cursor: grabbing;
-    }
-
-    .queue-footer {
-        padding: 8px 10px;
-        display: flex;
-        justify-content: center;
-        flex-shrink: 0;
-    }
-
-    .queue-clear-btn {
-        padding: 6px 14px;
-        border: 1px solid rgba(158, 66, 66, 0.4);
-        border-radius: 8px;
-        background: rgba(122, 58, 58, 0.1);
-        color: #d4a0a0;
-        font-size: 11px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background 0.2s ease-out, border-color 0.2s ease-out;
-    }
-
-    .queue-clear-btn:hover {
-        background: rgba(122, 58, 58, 0.25);
-        border-color: rgba(158, 66, 66, 0.6);
-    }
-
-    .grid.dragging .thumb-wrapper {
         cursor: grabbing;
     }
 </style>
