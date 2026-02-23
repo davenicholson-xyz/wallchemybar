@@ -18,6 +18,13 @@
     let people = $state(true);
     let atleast = $state("");
 
+    const ALL_RATIOS = ["16x9", "16x10", "21x9", "9x16", "4x3"] as const;
+    type Ratio = typeof ALL_RATIOS[number];
+    let selectedRatios = $state(new Set<Ratio>());
+
+    type ApiKeyStatus = "idle" | "checking" | "valid" | "invalid";
+    let apiKeyStatus = $state<ApiKeyStatus>("idle");
+
     const availableResolutions = [
         "1280x720", "1280x800", "1280x960", "1280x1024",
         "1600x900", "1600x1000", "1600x1200", "1600x1280",
@@ -34,6 +41,7 @@
                 purity: string;
                 categories: string;
                 atleast: string;
+                ratios: string;
             } = await invoke("load_settings");
             username = settings.username;
             apiKey = settings.api_key;
@@ -45,16 +53,37 @@
             anime = cats[1] === "1";
             people = cats[2] === "1";
             atleast = settings.atleast ?? "";
+            selectedRatios = new Set(
+                (settings.ratios ?? "").split(",").filter(r => r) as Ratio[]
+            );
+            if (settings.api_key.trim()) {
+                validateKey(settings.api_key);
+            }
         } catch {}
     });
+
+    async function validateKey(key: string) {
+        apiKeyStatus = "checking";
+        try {
+            const valid = await invoke<boolean>("validate_api_key", { apiKey: key });
+            apiKeyStatus = valid ? "valid" : "invalid";
+        } catch {
+            apiKeyStatus = "idle";
+        }
+    }
 
     async function save() {
         const purity = `${sfw ? "1" : "0"}${sketchy ? "1" : "0"}${nsfw ? "1" : "0"}`;
         const categories = `${general ? "1" : "0"}${anime ? "1" : "0"}${people ? "1" : "0"}`;
         await invoke("save_settings", {
-            settings: { username, api_key: apiKey, purity, categories, atleast },
+            settings: { username, api_key: apiKey, purity, categories, atleast, ratios: Array.from(selectedRatios).join(",") },
         });
         onreloadsearch("hot");
+        if (apiKey.trim()) {
+            validateKey(apiKey);
+        } else {
+            apiKeyStatus = "idle";
+        }
     }
 
     async function clearHistory() {
@@ -62,46 +91,101 @@
     }
 </script>
 
-<div class="p-[18px] h-full box-border overflow-y-auto">
-    <h3 class="mt-0 mb-4 text-[15px] font-semibold text-base-content tracking-[0.3px]">Settings</h3>
-    <form class="flex flex-col gap-3.5" onsubmit={(e) => { e.preventDefault(); save(); }}>
-        <div class="flex flex-col gap-1">
-            <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Username</span>
-            <input type="text" class="input input-sm input-bordered bg-base-200 border-base-300 placeholder:text-base-content/20" bind:value={username} placeholder="wallhaven username" />
-        </div>
-        <div class="flex flex-col gap-1">
-            <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">API Key</span>
-            <input type="password" class="input input-sm input-bordered bg-base-200 border-base-300 placeholder:text-base-content/20" bind:value={apiKey} placeholder="wallhaven API key" />
-        </div>
-        <div class="flex flex-col gap-1">
-            <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Categories</span>
-            <div class="join w-full">
-                <button type="button" class="join-item btn btn-sm flex-1 border-base-300 {general ? 'bg-info/20 text-info border-info/40' : 'bg-base-200 text-base-content/30'}" onclick={() => (general = !general)}>General</button>
-                <button type="button" class="join-item btn btn-sm flex-1 border-base-300 {anime ? 'bg-info/20 text-info border-info/40' : 'bg-base-200 text-base-content/30'}" onclick={() => (anime = !anime)}>Anime</button>
-                <button type="button" class="join-item btn btn-sm flex-1 border-base-300 {people ? 'bg-info/20 text-info border-info/40' : 'bg-base-200 text-base-content/30'}" onclick={() => (people = !people)}>People</button>
+<div class="p-[14px] h-full box-border overflow-y-auto flex flex-col gap-3">
+
+    <h3 class="mt-0 mb-0 text-[13px] font-semibold text-base-content/80 tracking-[0.2px]">Settings</h3>
+
+    <!-- Account -->
+    <div class="flex flex-col gap-[5px]">
+        <span class="text-[9px] font-semibold text-base-content/25 uppercase tracking-[1.2px] px-[2px]">Account</span>
+        <div class="bg-base-200 rounded-lg overflow-hidden">
+            <div class="flex items-center gap-2.5 px-3 py-2.5">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Username</span>
+                <input
+                    type="text"
+                    class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-base-content placeholder:text-base-content/20"
+                    bind:value={username}
+                    placeholder="wallhaven username"
+                />
+            </div>
+            <div class="border-t border-base-300/50 flex items-center gap-2.5 px-3 py-2.5">
+                <div class="flex items-center gap-1.5 w-[62px] shrink-0">
+                    <span class="text-[11px] text-base-content/40">API Key</span>
+                    {#if apiKeyStatus === "checking"}
+                        <span class="loading loading-spinner text-base-content/25" style="width:7px;height:7px"></span>
+                    {:else if apiKeyStatus === "valid"}
+                        <span class="w-[7px] h-[7px] rounded-full bg-success shrink-0" title="Valid"></span>
+                    {:else if apiKeyStatus === "invalid"}
+                        <span class="w-[7px] h-[7px] rounded-full bg-error shrink-0" title="Invalid"></span>
+                    {/if}
+                </div>
+                <input
+                    type="password"
+                    class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-base-content placeholder:text-base-content/20"
+                    bind:value={apiKey}
+                    oninput={() => { apiKeyStatus = "idle"; }}
+                    placeholder="api key"
+                />
             </div>
         </div>
-        <div class="flex flex-col gap-1">
-            <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Purity</span>
-            <div class="join w-full">
-                <button type="button" class="join-item btn btn-sm flex-1 border-base-300 {sfw ? 'bg-success/20 text-success border-success/40' : 'bg-base-200 text-base-content/30'}" onclick={() => (sfw = !sfw)}>SFW</button>
-                <button type="button" class="join-item btn btn-sm flex-1 border-base-300 {sketchy ? 'bg-warning/20 text-warning border-warning/40' : 'bg-base-200 text-base-content/30'}" onclick={() => (sketchy = !sketchy)}>Sketchy</button>
-                <button type="button" class="join-item btn btn-sm flex-1 border-base-300 {nsfw ? 'bg-error/20 text-error border-error/40' : 'bg-base-200 text-base-content/30'}" onclick={() => (nsfw = !nsfw)}>NSFW</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-col gap-[5px]">
+        <span class="text-[9px] font-semibold text-base-content/25 uppercase tracking-[1.2px] px-[2px]">Filters</span>
+        <div class="bg-base-200 rounded-lg overflow-hidden">
+            <div class="flex items-center gap-2.5 px-3 py-2">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Purity</span>
+                <div class="join flex-1">
+                    <button type="button" class="join-item btn btn-xs flex-1 {sfw ? 'bg-success/20 text-success border-success/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}" onclick={() => (sfw = !sfw)}>SFW</button>
+                    <button type="button" class="join-item btn btn-xs flex-1 {sketchy ? 'bg-warning/20 text-warning border-warning/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}" onclick={() => (sketchy = !sketchy)}>Sketchy</button>
+                    <button type="button" class="join-item btn btn-xs flex-1 {nsfw ? 'bg-error/20 text-error border-error/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}" onclick={() => (nsfw = !nsfw)}>NSFW</button>
+                </div>
+            </div>
+            <div class="border-t border-base-300/50 flex items-center gap-2.5 px-3 py-2">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Categories</span>
+                <div class="join flex-1">
+                    <button type="button" class="join-item btn btn-xs flex-1 {general ? 'bg-info/20 text-info border-info/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}" onclick={() => (general = !general)}>General</button>
+                    <button type="button" class="join-item btn btn-xs flex-1 {anime ? 'bg-info/20 text-info border-info/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}" onclick={() => (anime = !anime)}>Anime</button>
+                    <button type="button" class="join-item btn btn-xs flex-1 {people ? 'bg-info/20 text-info border-info/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}" onclick={() => (people = !people)}>People</button>
+                </div>
+            </div>
+            <div class="border-t border-base-300/50 flex items-center gap-2.5 px-3 py-2">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Ratio</span>
+                <div class="flex flex-wrap gap-1 flex-1">
+                    {#each ALL_RATIOS as ratio}
+                        {@const active = selectedRatios.has(ratio)}
+                        <button
+                            type="button"
+                            class="btn btn-xs border px-2 {active ? 'bg-primary/20 text-primary border-primary/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}"
+                            onclick={() => {
+                                const next = new Set(selectedRatios);
+                                next.has(ratio) ? next.delete(ratio) : next.add(ratio);
+                                selectedRatios = next;
+                            }}
+                        >{ratio.replace("x", ":")}</button>
+                    {/each}
+                </div>
+            </div>
+            <div class="border-t border-base-300/50 flex items-center gap-2.5 px-3 py-2.5">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Resolution</span>
+                <select
+                    class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-base-content cursor-pointer"
+                    bind:value={atleast}
+                >
+                    <option value="">Any</option>
+                    {#each availableResolutions as res}
+                        <option value={res}>{res}</option>
+                    {/each}
+                </select>
             </div>
         </div>
-        <div class="flex flex-col gap-1">
-            <span class="text-[10px] font-semibold text-base-content/40 uppercase tracking-[0.8px]">Minimum Resolution</span>
-            <select class="select select-sm select-bordered bg-base-200 border-base-300" bind:value={atleast}>
-                <option value="">Any</option>
-                {#each availableResolutions as res}
-                    <option value={res}>{res}</option>
-                {/each}
-            </select>
-        </div>
-        <button class="btn btn-primary btn-sm mt-1" type="submit">Save</button>
-    </form>
-    <div class="mt-3.5 pt-3.5 border-t border-base-300 flex flex-col gap-2">
-        <button class="btn btn-error btn-outline btn-sm w-full" onclick={clearHistory}>Clear History</button>
-        <button class="btn btn-ghost btn-sm w-full text-base-content/40" onclick={() => invoke("quit_app")}>Quit</button>
+    </div>
+
+    <button class="btn btn-primary btn-sm w-full" onclick={save}>Save</button>
+
+    <div class="mt-auto pt-3 border-t border-base-300/50 flex flex-col gap-1.5">
+        <button class="btn btn-error btn-outline btn-xs w-full" onclick={clearHistory}>Clear History</button>
+        <button class="btn btn-ghost btn-xs w-full text-base-content/30" onclick={() => invoke("quit_app")}>Quit</button>
     </div>
 </div>

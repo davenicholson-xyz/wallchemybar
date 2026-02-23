@@ -10,6 +10,7 @@
         activeView: View;
         queue: Wallpaper[];
         settingWallpaper: string;
+        selectedIndex: number;
         onapply: (wp: Wallpaper) => void;
         onopenpreview: (wp: Wallpaper) => void;
         ontogglequeue: (wp: Wallpaper) => void;
@@ -25,11 +26,20 @@
         activeView,
         queue,
         settingWallpaper,
+        selectedIndex,
         onapply,
         onopenpreview,
         ontogglequeue,
         ondeletehistory,
     }: Props = $props();
+
+    let gridEl: HTMLDivElement | undefined;
+
+    $effect(() => {
+        if (selectedIndex < 0 || !gridEl) return;
+        const item = gridEl.children[selectedIndex] as HTMLElement | undefined;
+        item?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
 </script>
 
 {#if loading}
@@ -44,11 +54,12 @@
     <p class="text-center py-6 text-base-content/40 text-xs">No wallpapers found</p>
 
 {:else}
-    <div class="grid grid-cols-3 gap-1.5 p-1.5">
-        {#each wallpapers as wp (wp.id)}
+    <div class="grid grid-cols-3 gap-1.5 p-1.5" bind:this={gridEl}>
+        {#each wallpapers as wp, i (wp.id)}
             <div
                 class="thumb-wrapper group relative overflow-hidden rounded-lg transition-all duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                 class:setting={settingWallpaper === wp.id}
+                class:selected={selectedIndex === i}
             >
                 <button
                     class="thumb w-full border-0 p-0 bg-transparent block cursor-pointer disabled:cursor-default disabled:opacity-50"
@@ -107,6 +118,12 @@
 {/if}
 
 <style>
+    .thumb-wrapper.selected {
+        outline: 2px solid #fde047;
+        outline-offset: 1px;
+        z-index: 1;
+    }
+
     .thumb-wrapper:hover {
         transform: scale(1.03);
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);

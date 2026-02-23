@@ -12,6 +12,8 @@ pub struct Settings {
     pub categories: String,
     #[serde(default)]
     pub atleast: String,
+    #[serde(default)]
+    pub ratios: String,
 }
 
 fn default_purity() -> String {
@@ -30,6 +32,7 @@ impl Default for Settings {
             purity: default_purity(),
             categories: default_categories(),
             atleast: String::new(),
+            ratios: String::new(),
         }
     }
 }

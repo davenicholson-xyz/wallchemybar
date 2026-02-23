@@ -17,6 +17,7 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager, PhysicalPosition, WindowEvent,
 };
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 #[tauri::command]
 fn hide_main(app: tauri::AppHandle) {
@@ -40,6 +41,7 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             settings::load_settings,
             settings::save_settings,
@@ -48,6 +50,7 @@ pub fn run() {
             wallhaven::fetch_collection_wallpapers,
             wallhaven::set_wallpaper,
             wallhaven::fetch_wallpaper_tags,
+            wallhaven::validate_api_key,
             history::get_history,
             history::clear_history,
             history::delete_history_entry,
@@ -61,6 +64,29 @@ pub fn run() {
             quit_app
         ])
         .setup(|app| {
+            // Hide the app from the macOS Dock — it lives only in the menu bar
+            #[cfg(target_os = "macos")]
+            unsafe {
+                let ns_app: *mut objc::runtime::Object =
+                    msg_send![class!(NSApplication), sharedApplication];
+                let _: () = msg_send![ns_app, setActivationPolicy: 1i64]; // NSApplicationActivationPolicyAccessory
+            }
+
+            // Cmd+Shift+W — toggle window from anywhere
+            let toggle = Shortcut::new(Some(Modifiers::META | Modifiers::SHIFT), Code::KeyW);
+            app.handle().global_shortcut().on_shortcut(toggle, |app, _shortcut, event| {
+                if event.state() == ShortcutState::Pressed {
+                    if let Some(window) = app.get_webview_window("main") {
+                        if window.is_visible().unwrap_or(false) {
+                            let _ = window.hide();
+                        } else {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                }
+            })?;
+
             let icon = app
                 .default_window_icon()
                 .cloned()

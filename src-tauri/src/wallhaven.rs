@@ -81,6 +81,7 @@ pub async fn fetch_search(
     let purity = settings.purity.clone();
     let categories = settings.categories.clone();
     let atleast = settings.atleast.clone();
+    let ratios = settings.ratios.clone();
     let query_str = query.unwrap_or_default();
     let mut req = client.get("https://wallhaven.cc/api/v1/search").query(&[
         ("sorting", sorting.as_str()),
@@ -93,6 +94,9 @@ pub async fn fetch_search(
     }
     if !atleast.is_empty() {
         req = req.query(&[("atleast", atleast.as_str())]);
+    }
+    if !ratios.is_empty() {
+        req = req.query(&[("ratios", ratios.as_str())]);
     }
 
     let api_key = settings.api_key.trim().to_string();
@@ -124,6 +128,9 @@ pub async fn fetch_search(
         }
         if !atleast.is_empty() {
             retry = retry.query(&[("atleast", atleast.as_str())]);
+        }
+        if !ratios.is_empty() {
+            retry = retry.query(&[("ratios", ratios.as_str())]);
         }
         retry
             .send()
@@ -316,6 +323,23 @@ pub async fn fetch_collection_wallpapers(
 
     info!("fetch_collection_wallpapers: returned {} wallpapers", resp.data.len());
     Ok(resp.data)
+}
+
+#[tauri::command]
+pub async fn validate_api_key(api_key: String) -> Result<bool, String> {
+    let trimmed = api_key.trim();
+    if trimmed.is_empty() {
+        return Ok(false);
+    }
+    let client = build_client()?;
+    let response = client
+        .get("https://wallhaven.cc/api/v1/settings")
+        .header("X-API-Key", trimmed)
+        .send()
+        .await
+        .map_err(|e| format!("request failed: {e}"))?;
+    debug!("validate_api_key: status={}", response.status());
+    Ok(response.status().as_u16() == 200)
 }
 
 #[tauri::command]

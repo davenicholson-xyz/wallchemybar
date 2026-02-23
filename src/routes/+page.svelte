@@ -1,6 +1,6 @@
 <script lang="ts">
     import { invoke } from "@tauri-apps/api/core";
-    import { onMount } from "svelte";
+    import { onMount, tick } from "svelte";
     import type { Tag, Wallpaper, Collection, View } from "$lib/types";
     import Sidebar from "$lib/components/Sidebar.svelte";
     import WallpaperGrid from "$lib/components/WallpaperGrid.svelte";
@@ -43,7 +43,17 @@
     let hasMore = $state(true);
     let mainEl: HTMLElement;
     let searchInput = $state("");
+    let searchInputEl: HTMLInputElement | undefined;
     let selectedCollectionId: number | null = $state(null);
+    let selectedIndex = $state(-1);
+
+    let isGridView = $derived(
+        activeView.kind !== "settings" && activeView.kind !== "queue"
+    );
+
+    $effect(() => {
+        if (loading) selectedIndex = -1;
+    });
     let undoing = $state(false);
 
     // ─── Preview state ───────────────────────────────────────────────────────────
@@ -121,11 +131,13 @@
         await loadCollection(id);
     }
 
-    function activateSearch() {
+    async function activateSearch() {
         activeView = { kind: "query", query: "" };
         wallpapers = [];
         loading = false;
         error = "";
+        await tick();
+        searchInputEl?.focus();
     }
 
     async function searchQuery() {
@@ -392,7 +404,73 @@
     function openSettings() {
         activeView = { kind: "settings" };
     }
+
+    function handleKeyDown(e: KeyboardEvent) {
+        const target = e.target as HTMLElement;
+        const inInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
+
+        if (e.key === "Escape" && previewWallpaper) {
+            previewWallpaper = null;
+            return;
+        }
+        if (previewWallpaper) return;
+
+        if (!inInput) {
+            switch (e.key) {
+                case "s": e.preventDefault(); activateSearch(); return;
+                case "n": e.preventDefault(); loadSearch("date_added"); return;
+                case "r": e.preventDefault(); loadSearch("random"); return;
+                case "t": e.preventDefault(); loadSearch("toplist"); return;
+                case "c": e.preventDefault(); activateCollections(); return;
+                case "h": e.preventDefault(); loadHistory(); return;
+                case "q": e.preventDefault(); activateQueue(); return;
+                case "u": e.preventDefault(); undoWallpaper(); return;
+                case ",": e.preventDefault(); openSettings(); return;
+            }
+        }
+
+        if (!isGridView || inInput || wallpapers.length === 0) return;
+
+        switch (e.key) {
+            case "ArrowRight":
+                e.preventDefault();
+                selectedIndex = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 1, wallpapers.length - 1);
+                break;
+            case "ArrowLeft":
+                e.preventDefault();
+                selectedIndex = selectedIndex < 0 ? 0 : Math.max(selectedIndex - 1, 0);
+                break;
+            case "ArrowDown":
+                e.preventDefault();
+                selectedIndex = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 3, wallpapers.length - 1);
+                break;
+            case "ArrowUp":
+                e.preventDefault();
+                selectedIndex = selectedIndex < 0 ? 0 : Math.max(selectedIndex - 3, 0);
+                break;
+            case " ":
+                if (selectedIndex >= 0 && wallpapers[selectedIndex]) {
+                    e.preventDefault();
+                    openPreview(wallpapers[selectedIndex]);
+                }
+                break;
+            case "a":
+                if (selectedIndex >= 0 && wallpapers[selectedIndex]) {
+                    e.preventDefault();
+                    toggleQueue(wallpapers[selectedIndex]);
+                }
+                break;
+            case "Enter":
+                if (selectedIndex >= 0 && wallpapers[selectedIndex]) {
+                    e.preventDefault();
+                    applyWallpaper(wallpapers[selectedIndex]);
+                }
+                break;
+        }
+    }
 </script>
+
+<svelte:window onkeydown={handleKeyDown} />
 
 <div class="flex h-screen w-full bg-base-100 overflow-hidden">
     <Sidebar
@@ -437,6 +515,7 @@
                 <input
                     type="text"
                     class="input input-sm input-bordered w-full bg-base-200 border-base-300 placeholder:text-base-content/25 focus:outline-none focus:border-primary"
+                    bind:this={searchInputEl}
                     bind:value={searchInput}
                     placeholder="Search wallpapers..."
                 />
@@ -472,6 +551,7 @@
                 {activeView}
                 {queue}
                 {settingWallpaper}
+                {selectedIndex}
                 onapply={applyWallpaper}
                 onopenpreview={openPreview}
                 ontogglequeue={toggleQueue}
