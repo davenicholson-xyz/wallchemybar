@@ -11,6 +11,8 @@
         queue: Wallpaper[];
         settingWallpaper: string;
         selectedIndex: number;
+        cols?: number;
+        onhoverwallpaper?: (wp: Wallpaper | null) => void;
         onapply: (wp: Wallpaper) => void;
         onopenpreview: (wp: Wallpaper) => void;
         ontogglequeue: (wp: Wallpaper) => void;
@@ -27,6 +29,8 @@
         queue,
         settingWallpaper,
         selectedIndex,
+        cols = 3,
+        onhoverwallpaper,
         onapply,
         onopenpreview,
         ontogglequeue,
@@ -54,12 +58,14 @@
     <p class="text-center py-6 text-base-content/40 text-xs">No wallpapers found</p>
 
 {:else}
-    <div class="grid grid-cols-3 gap-1.5 p-1.5" bind:this={gridEl}>
+    <div class="grid gap-1.5 p-1.5" style="grid-template-columns: repeat({cols}, minmax(0, 1fr))" bind:this={gridEl}>
         {#each wallpapers as wp, i (wp.id)}
             <div
                 class="thumb-wrapper group relative overflow-hidden rounded-lg transition-all duration-[250ms] ease-[cubic-bezier(0.34,1.56,0.64,1)]"
                 class:setting={settingWallpaper === wp.id}
                 class:selected={selectedIndex === i}
+                onmouseenter={() => onhoverwallpaper?.(wp)}
+                onmouseleave={() => onhoverwallpaper?.(null)}
             >
                 <button
                     class="thumb w-full border-0 p-0 bg-transparent block cursor-pointer disabled:cursor-default disabled:opacity-50"

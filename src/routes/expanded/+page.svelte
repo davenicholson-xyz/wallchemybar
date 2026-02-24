@@ -2,11 +2,11 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount, tick } from "svelte";
     import type { Tag, Wallpaper, Collection, View } from "$lib/types";
-    import Sidebar from "$lib/components/Sidebar.svelte";
+    import ExpandedSidebar from "$lib/components/ExpandedSidebar.svelte";
     import WallpaperGrid from "$lib/components/WallpaperGrid.svelte";
-    import PreviewModal from "$lib/components/PreviewModal.svelte";
     import QueuePanel from "$lib/components/QueuePanel.svelte";
     import SettingsPanel from "$lib/components/SettingsPanel.svelte";
+    import PreviewPanel from "$lib/components/PreviewPanel.svelte";
 
     const categories: { label: string; sorting: string; icon: string }[] = [
         {
@@ -46,22 +46,58 @@
     let searchInputEl: HTMLInputElement | undefined;
     let selectedCollectionId: number | null = $state(null);
     let selectedIndex = $state(-1);
+    let hoverWallpaper: Wallpaper | null = $state(null);
 
     let isGridView = $derived(
         activeView.kind !== "settings" && activeView.kind !== "queue"
     );
 
     $effect(() => {
-        if (loading) selectedIndex = -1;
+        if (loading) { selectedIndex = -1; previewTags = []; }
     });
+
+    // Auto-fill: after each page loads, if the content doesn't yet overflow the
+    // scroll container fetch another page — keeps going until the user can scroll.
+    $effect(() => {
+        const _ = wallpapers.length;
+        if (loading || loadingMore || !hasMore || !isGridView) return;
+        tick().then(() => {
+            if (mainEl && mainEl.scrollHeight <= mainEl.clientHeight) {
+                loadNextPage();
+            }
+        });
+    });
+
     let undoing = $state(false);
 
-    // ─── Preview state ───────────────────────────────────────────────────────────
-    let previewWallpaper: Wallpaper | null = $state(null);
+    // ─── Preview state (for PreviewPanel) ────────────────────────────────────────
     let previewTags: Tag[] = $state([]);
     let loadingTags = $state(false);
+    let previewWallpaper: Wallpaper | null = $derived(
+        hoverWallpaper ?? (selectedIndex >= 0 ? wallpapers[selectedIndex] ?? null : null)
+    );
 
-    // ─── Queue state (persists across view changes) ───────────────────────────────
+    // Tag cache: avoids re-fetching wallpapers already seen this session.
+    // Tags are only loaded when a thumb is clicked — hover never triggers an API request.
+    const tagCache = new Map<string, Tag[]>();
+
+    async function loadTagsFor(wp: Wallpaper) {
+        const cached = tagCache.get(wp.id);
+        if (cached) {
+            previewTags = cached;
+            return;
+        }
+        previewTags = [];
+        loadingTags = true;
+        try {
+            const tags = await invoke<Tag[]>("fetch_wallpaper_tags", { wallpaperId: wp.id });
+            tagCache.set(wp.id, tags);
+            if (previewWallpaper?.id === wp.id) previewTags = tags;
+        } catch {}
+        if (previewWallpaper?.id === wp.id) loadingTags = false;
+    }
+
+    // ─── Queue state ─────────────────────────────────────────────────────────────
     let queue: Wallpaper[] = $state([]);
     let queueIntervalMinutes = $state(30);
     let queueRunning = $state(false);
@@ -78,7 +114,6 @@
 
     // ─── Search / browse ─────────────────────────────────────────────────────────
     async function loadSearch(sorting: string) {
-        console.log(`[wallchemybar] loadSearch: sorting=${sorting}`);
         activeView = { kind: "search", sorting };
         page = 1;
         hasMore = true;
@@ -88,9 +123,7 @@
             const results: Wallpaper[] = await invoke("fetch_search", { sorting, page: 1 });
             wallpapers = results;
             hasMore = results.length >= 24;
-            console.log(`[wallchemybar] loadSearch: got ${results.length} results, hasMore=${hasMore}`);
         } catch (e) {
-            console.error("[wallchemybar] loadSearch: error:", e);
             error = String(e);
         } finally {
             loading = false;
@@ -164,8 +197,6 @@
         if (activeView.kind === "history") return;
         loadingMore = true;
         const nextPage = page + 1;
-        const startTime = performance.now();
-        console.log(`[wallchemybar] loadNextPage: requesting page ${nextPage}, view=${activeView.kind}, current total=${wallpapers.length}`);
         try {
             let results: Wallpaper[];
             if (activeView.kind === "search") {
@@ -175,22 +206,15 @@
             } else if (activeView.kind === "collection") {
                 results = await invoke("fetch_collection_wallpapers", { collectionId: activeView.id, page: nextPage });
             } else {
-                console.warn(`[wallchemybar] loadNextPage: unexpected view kind: ${activeView.kind}`);
                 loadingMore = false;
                 return;
             }
-            const elapsed = (performance.now() - startTime).toFixed(0);
             const existingIds = new Set(wallpapers.map((w) => w.id));
             const newResults = results.filter((w) => !existingIds.has(w.id));
-            const dupes = results.length - newResults.length;
-            if (dupes > 0) console.warn(`[wallchemybar] loadNextPage: filtered ${dupes} duplicate wallpapers from page ${nextPage}`);
-            console.log(`[wallchemybar] loadNextPage: got ${results.length} results (${newResults.length} new) for page ${nextPage} in ${elapsed}ms`);
             wallpapers = [...wallpapers, ...newResults];
             page = nextPage;
             hasMore = results.length >= 24;
-            console.log(`[wallchemybar] loadNextPage: hasMore=${hasMore}, total wallpapers=${wallpapers.length}`);
-        } catch (e) {
-            console.error(`[wallchemybar] loadNextPage: error on page ${nextPage}:`, e);
+        } catch {
             hasMore = false;
         } finally {
             loadingMore = false;
@@ -205,17 +229,13 @@
             scrollTicking = false;
             if (!mainEl) return;
             const { scrollTop, scrollHeight, clientHeight } = mainEl;
-            const remaining = scrollHeight - scrollTop - clientHeight;
-            if (remaining < 200) {
-                console.log(`[wallchemybar] onScroll: near bottom (${remaining.toFixed(0)}px remaining), loadingMore=${loadingMore}, hasMore=${hasMore}`);
-                loadNextPage();
-            }
+            if (scrollHeight - scrollTop - clientHeight < 200) loadNextPage();
         });
     }
 
     // ─── Wallpaper actions ───────────────────────────────────────────────────────
     async function applyWallpaper(wp: Wallpaper) {
-        invoke("hide_main");
+        // Expanded window stays open after apply (no hide_main call)
         settingWallpaper = wp.id;
         try {
             await invoke("set_wallpaper", { wallpaper: wp });
@@ -230,7 +250,6 @@
         undoing = true;
         try {
             await invoke("undo_wallpaper");
-            invoke("hide_main");
         } catch (e) {
             error = String(e);
         } finally {
@@ -263,23 +282,9 @@
         }
     }
 
-    // ─── Preview ─────────────────────────────────────────────────────────────────
-    async function openPreview(wp: Wallpaper) {
-        previewWallpaper = wp;
-        previewTags = [];
-        loadingTags = true;
-        try {
-            const tags: Tag[] = await invoke("fetch_wallpaper_tags", { wallpaperId: wp.id });
-            if (previewWallpaper?.id === wp.id) previewTags = tags;
-        } catch {
-            // silently ignore — tags are non-critical
-        } finally {
-            loadingTags = false;
-        }
-    }
-
+    // ─── Preview panel search actions ────────────────────────────────────────────
     async function searchTag(tag: Tag) {
-        previewWallpaper = null;
+        hoverWallpaper = null;
         const q = tag.name;
         searchInput = q;
         activeView = { kind: "query", query: q };
@@ -300,7 +305,7 @@
 
     async function searchSimilar(wp: Wallpaper) {
         const q = "like:" + wp.id;
-        previewWallpaper = null;
+        hoverWallpaper = null;
         searchInput = q;
         activeView = { kind: "query", query: q };
         page = 1;
@@ -367,7 +372,6 @@
     }
 
     function changeQueueInterval(minutes: number) {
-        // queueIntervalMinutes already updated by $bindable; just restart timer if needed
         if (queueRunning) {
             clearInterval(queueTimerId);
             queueTimerId = setInterval(advanceQueue, minutes * 60 * 1000);
@@ -398,7 +402,7 @@
 
     async function reorderQueue(reordered: Wallpaper[]) {
         queue = reordered;
-        invoke("reorder_queue", { wallpapers: reordered }).catch(err => { error = String(err); });
+        invoke("reorder_queue", { wallpapers: reordered }).catch((err) => { error = String(err); });
     }
 
     function openSettings() {
@@ -409,11 +413,10 @@
         const target = e.target as HTMLElement;
         const inInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
 
-        if (e.key === "Escape" && previewWallpaper) {
-            previewWallpaper = null;
+        if (e.key === "Escape") {
+            hoverWallpaper = null;
             return;
         }
-        if (previewWallpaper) return;
 
         if (!inInput) {
             switch (e.key) {
@@ -427,7 +430,7 @@
                 case "Q": e.preventDefault(); activateQueue(); return;
                 case "U": e.preventDefault(); undoWallpaper(); return;
                 case ",": e.preventDefault(); openSettings(); return;
-                case "E": e.preventDefault(); invoke("open_expanded"); return;
+                case "E": e.preventDefault(); invoke("close_expanded"); return;
             }
         }
 
@@ -444,11 +447,11 @@
                 break;
             case "ArrowDown":
                 e.preventDefault();
-                selectedIndex = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 3, wallpapers.length - 1);
+                selectedIndex = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 5, wallpapers.length - 1);
                 break;
             case "ArrowUp":
                 e.preventDefault();
-                selectedIndex = selectedIndex < 0 ? 0 : Math.max(selectedIndex - 3, 0);
+                selectedIndex = selectedIndex < 0 ? 0 : Math.max(selectedIndex - 5, 0);
                 break;
             case "h":
                 e.preventDefault();
@@ -460,16 +463,16 @@
                 break;
             case "j":
                 e.preventDefault();
-                selectedIndex = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 3, wallpapers.length - 1);
+                selectedIndex = selectedIndex < 0 ? 0 : Math.min(selectedIndex + 5, wallpapers.length - 1);
                 break;
             case "k":
                 e.preventDefault();
-                selectedIndex = selectedIndex < 0 ? 0 : Math.max(selectedIndex - 3, 0);
+                selectedIndex = selectedIndex < 0 ? 0 : Math.max(selectedIndex - 5, 0);
                 break;
             case " ":
                 if (selectedIndex >= 0 && wallpapers[selectedIndex]) {
                     e.preventDefault();
-                    openPreview(wallpapers[selectedIndex]);
+                    // Space focuses the selected wallpaper in preview — already handled by derived
                 }
                 break;
             case "a":
@@ -486,111 +489,111 @@
                 break;
         }
     }
+
 </script>
 
 <svelte:window onkeydown={handleKeyDown} />
 
 <div class="flex h-screen w-full bg-base-100 overflow-hidden">
-    <Sidebar
-        {activeView}
-        {collections}
-        {undoing}
-        {categories}
-        isactive={isActive}
-        onloadsearch={loadSearch}
-        onloadhistory={loadHistory}
-        onactivatequeue={activateQueue}
-        onactivatesearch={activateSearch}
-        onactivatecollections={activateCollections}
-        onopensettings={openSettings}
-        onundowallpaper={undoWallpaper}
-        onexpand={() => invoke("open_expanded")}
-    />
+        <ExpandedSidebar
+            {activeView}
+            {collections}
+            {undoing}
+            {categories}
+            isactive={isActive}
+            onloadsearch={loadSearch}
+            onloadhistory={loadHistory}
+            onactivatequeue={activateQueue}
+            onactivatesearch={activateSearch}
+            onactivatecollections={activateCollections}
+            onopensettings={openSettings}
+            onundowallpaper={undoWallpaper}
+            oncollapsetopopup={() => invoke("close_expanded")}
+        />
 
-    <main bind:this={mainEl} onscroll={onScroll} class="flex-1 overflow-y-auto min-w-0 bg-gradient-to-b from-base-100 to-base-200/50">
+        <main bind:this={mainEl} onscroll={onScroll} class="flex-1 overflow-y-auto min-w-0 bg-gradient-to-b from-base-100 to-base-200/50">
 
-        <!-- Collections picker -->
-        {#if activeView.kind === "collections" || activeView.kind === "collection"}
-            <div class="p-2">
-                <select
-                    class="select select-sm select-bordered w-full bg-base-200 border-base-300"
-                    value={selectedCollectionId ?? ""}
-                    onchange={(e) => {
-                        const val = (e.target as HTMLSelectElement).value;
-                        if (val) selectCollection(Number(val));
-                    }}
-                >
-                    <option value="" disabled>Select a collection...</option>
-                    {#each collections as col (col.id)}
-                        <option value={col.id}>{col.label} ({col.count})</option>
-                    {/each}
-                </select>
-            </div>
-        {/if}
+            <!-- Collections picker -->
+            {#if activeView.kind === "collections" || activeView.kind === "collection"}
+                <div class="p-2">
+                    <select
+                        class="select select-sm select-bordered w-full bg-base-200 border-base-300"
+                        value={selectedCollectionId ?? ""}
+                        onchange={(e) => {
+                            const val = (e.target as HTMLSelectElement).value;
+                            if (val) selectCollection(Number(val));
+                        }}
+                    >
+                        <option value="" disabled>Select a collection...</option>
+                        {#each collections as col (col.id)}
+                            <option value={col.id}>{col.label} ({col.count})</option>
+                        {/each}
+                    </select>
+                </div>
+            {/if}
 
-        <!-- Search bar -->
-        {#if activeView.kind === "query"}
-            <form class="p-2" onsubmit={(e) => { e.preventDefault(); searchQuery(); }}>
-                <input
-                    type="text"
-                    class="input input-sm input-bordered w-full bg-base-200 border-base-300 placeholder:text-base-content/25 focus:outline-none focus:border-primary"
-                    bind:this={searchInputEl}
-                    bind:value={searchInput}
-                    placeholder="Search wallpapers..."
+            <!-- Search bar -->
+            {#if activeView.kind === "query"}
+                <form class="p-2" onsubmit={(e) => { e.preventDefault(); searchQuery(); }}>
+                    <input
+                        type="text"
+                        class="input input-sm input-bordered w-full bg-base-200 border-base-300 placeholder:text-base-content/25 focus:outline-none focus:border-primary"
+                        bind:this={searchInputEl}
+                        bind:value={searchInput}
+                        placeholder="Search wallpapers..."
+                    />
+                </form>
+            {/if}
+
+            {#if activeView.kind === "settings"}
+                <SettingsPanel onreloadsearch={loadSearch} />
+
+            {:else if activeView.kind === "queue"}
+                <QueuePanel
+                    {queue}
+                    {settingWallpaper}
+                    {queueRunning}
+                    bind:queueIntervalMinutes={queueIntervalMinutes}
+                    {queueIndex}
+                    onstartcycling={startCycling}
+                    onstopcycling={stopCycling}
+                    onchangeinterval={changeQueueInterval}
+                    onremove={removeFromQueue}
+                    onclear={clearQueue}
+                    onapply={applyWallpaper}
+                    onreorder={reorderQueue}
                 />
-            </form>
-        {/if}
 
-        {#if activeView.kind === "settings"}
-            <SettingsPanel onreloadsearch={loadSearch} />
+            {:else}
+                <WallpaperGrid
+                    {wallpapers}
+                    {loading}
+                    {loadingMore}
+                    {error}
+                    {hasMore}
+                    {activeView}
+                    {queue}
+                    {settingWallpaper}
+                    {selectedIndex}
+                    cols={5}
+                    onhoverwallpaper={(wp) => { hoverWallpaper = wp; }}
+                    onapply={(wp) => { selectedIndex = wallpapers.findIndex((w) => w.id === wp.id); hoverWallpaper = null; loadTagsFor(wp); }}
+                    onopenpreview={(wp) => { selectedIndex = wallpapers.findIndex((w) => w.id === wp.id); hoverWallpaper = null; loadTagsFor(wp); }}
+                    ontogglequeue={toggleQueue}
+                    ondeletehistory={deleteHistoryEntry}
+                />
+            {/if}
+        </main>
 
-        {:else if activeView.kind === "queue"}
-            <QueuePanel
-                {queue}
-                {settingWallpaper}
-                {queueRunning}
-                bind:queueIntervalMinutes={queueIntervalMinutes}
-                {queueIndex}
-                onstartcycling={startCycling}
-                onstopcycling={stopCycling}
-                onchangeinterval={changeQueueInterval}
-                onremove={removeFromQueue}
-                onclear={clearQueue}
-                onapply={applyWallpaper}
-                onreorder={reorderQueue}
-            />
-
-        {:else}
-            <WallpaperGrid
-                {wallpapers}
-                {loading}
-                {loadingMore}
-                {error}
-                {hasMore}
-                {activeView}
-                {queue}
-                {settingWallpaper}
-                {selectedIndex}
-                onapply={applyWallpaper}
-                onopenpreview={openPreview}
-                ontogglequeue={toggleQueue}
-                ondeletehistory={deleteHistoryEntry}
-            />
-        {/if}
-    </main>
+        <PreviewPanel
+            wallpaper={previewWallpaper}
+            tags={previewTags}
+            {loadingTags}
+            onapply={applyWallpaper}
+            onsearchtag={searchTag}
+            onsearchsimilar={searchSimilar}
+        />
 </div>
-
-{#if previewWallpaper}
-    <PreviewModal
-        wallpaper={previewWallpaper}
-        tags={previewTags}
-        loadingTags={loadingTags}
-        onclose={() => (previewWallpaper = null)}
-        onapply={(wp) => { applyWallpaper(wp); previewWallpaper = null; }}
-        onsearchtag={searchTag}
-        onsearchsimilar={searchSimilar}
-    />
-{/if}
 
 <style>
     :global(body) {

@@ -31,6 +31,24 @@ fn quit_app(app: tauri::AppHandle) {
     app.exit(0);
 }
 
+#[tauri::command]
+fn open_expanded(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.hide();
+    }
+    if let Some(w) = app.get_webview_window("expanded") {
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+}
+
+#[tauri::command]
+fn close_expanded(app: tauri::AppHandle) {
+    if let Some(w) = app.get_webview_window("expanded") {
+        let _ = w.hide();
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -61,7 +79,9 @@ pub fn run() {
             queue::reorder_queue,
             queue::clear_queue,
             hide_main,
-            quit_app
+            quit_app,
+            open_expanded,
+            close_expanded
         ])
         .setup(|app| {
             // Hide the app from the macOS Dock — it lives only in the menu bar
@@ -82,6 +102,24 @@ pub fn run() {
                         } else {
                             let _ = window.show();
                             let _ = window.set_focus();
+                        }
+                    }
+                }
+            })?;
+
+            // Cmd+Shift+E — open/focus expanded window from anywhere
+            let expand = Shortcut::new(Some(Modifiers::META | Modifiers::SHIFT), Code::KeyE);
+            app.handle().global_shortcut().on_shortcut(expand, |app, _shortcut, event| {
+                if event.state() == ShortcutState::Pressed {
+                    if let Some(expanded) = app.get_webview_window("expanded") {
+                        if expanded.is_visible().unwrap_or(false) {
+                            let _ = expanded.hide();
+                        } else {
+                            if let Some(main) = app.get_webview_window("main") {
+                                let _ = main.hide();
+                            }
+                            let _ = expanded.show();
+                            let _ = expanded.set_focus();
                         }
                     }
                 }

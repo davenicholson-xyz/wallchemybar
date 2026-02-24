@@ -21,6 +21,20 @@
         "resizable": false,
         "alwaysOnTop": true,
         "skipTaskbar": true
+      },
+      {
+        "label": "expanded",
+        "title": "wallchemybar",
+        "url": "/expanded",
+        "width": 1000,
+        "height": 650,
+        "minWidth": 700,
+        "minHeight": 450,
+        "visible": false,
+        "decorations": true,
+        "resizable": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false
       }
     ],
     "security": {
