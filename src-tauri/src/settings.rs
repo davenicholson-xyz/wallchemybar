@@ -14,6 +14,10 @@ pub struct Settings {
     pub atleast: String,
     #[serde(default)]
     pub ratios: String,
+    #[serde(default)]
+    pub collection_cycle_collection_id: u64,
+    #[serde(default = "default_collection_cycle_interval")]
+    pub collection_cycle_interval_minutes: u32,
 }
 
 fn default_purity() -> String {
@@ -22,6 +26,10 @@ fn default_purity() -> String {
 
 fn default_categories() -> String {
     "111".to_string()
+}
+
+fn default_collection_cycle_interval() -> u32 {
+    30
 }
 
 impl Default for Settings {
@@ -33,6 +41,8 @@ impl Default for Settings {
             categories: default_categories(),
             atleast: String::new(),
             ratios: String::new(),
+            collection_cycle_collection_id: 0,
+            collection_cycle_interval_minutes: default_collection_cycle_interval(),
         }
     }
 }

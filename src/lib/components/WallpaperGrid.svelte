@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { openUrl } from "@tauri-apps/plugin-opener";
     import type { Wallpaper, View } from "$lib/types";
 
     interface Props {
@@ -78,6 +79,15 @@
                             <span class="loading loading-spinner loading-sm text-white"></span>
                         </span>
                     {/if}
+                </button>
+
+                <!-- Wallhaven link icon (top-right, second from right) -->
+                <button
+                    class="absolute top-1.5 right-9 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-white/85 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-white/20 hover:text-white transition-all duration-200"
+                    onclick={(e) => { e.stopPropagation(); openUrl(`https://wallhaven.cc/w/${wp.id}`); }}
+                    title="View on Wallhaven"
+                >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
                 </button>
 
                 <!-- Preview icon (top-right) -->

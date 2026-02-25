@@ -269,6 +269,18 @@ pub fn run() {
                 });
             }
 
+            // Intercept the close button on the expanded window so it hides
+            // rather than being destroyed — otherwise it can't be reopened.
+            if let Some(expanded_window) = app.get_webview_window("expanded") {
+                let w = expanded_window.clone();
+                expanded_window.on_window_event(move |event| {
+                    if let WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = w.hide();
+                    }
+                });
+            }
+
             Ok(())
         })
         .run(tauri::generate_context!())

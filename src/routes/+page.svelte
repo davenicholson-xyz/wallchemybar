@@ -7,6 +7,7 @@
     import PreviewModal from "$lib/components/PreviewModal.svelte";
     import QueuePanel from "$lib/components/QueuePanel.svelte";
     import SettingsPanel from "$lib/components/SettingsPanel.svelte";
+    import CollectionCycleBar from "$lib/components/CollectionCycleBar.svelte";
 
     const categories: { label: string; sorting: string; icon: string }[] = [
         {
@@ -45,6 +46,7 @@
     let searchInput = $state("");
     let searchInputEl: HTMLInputElement | undefined;
     let selectedCollectionId: number | null = $state(null);
+    let searchSeed: string | null = null;
     let selectedIndex = $state(-1);
 
     let isGridView = $derived(
@@ -68,11 +70,29 @@
     let queueIndex = $state(0);
     let queueTimerId: ReturnType<typeof setInterval> | undefined;
 
+    // ─── Collection cycling state ─────────────────────────────────────────────
+    let collectionCycleRunning = $state(false);
+    let collectionCycleIntervalMinutes = $state(30);
+    let collectionCycleTimerId: ReturnType<typeof setInterval> | undefined;
+    let collectionCyclePage = $state(1);
+    let collectionCyclePageIndex = $state(0);
+    let collectionCycleBuffer: Wallpaper[] = [];
+
     // ─── Lifecycle ───────────────────────────────────────────────────────────────
     onMount(async () => {
         invoke("fetch_collections")
             .then((cols) => { collections = cols as Collection[]; })
             .catch(() => {});
+        invoke("load_settings").then((s: any) => {
+            if (s.collection_cycle_interval_minutes) {
+                collectionCycleIntervalMinutes = s.collection_cycle_interval_minutes;
+            }
+            // Restore last-used collection ID so CollectionCycleBar is pre-configured,
+            // but do NOT call loadCollection here — it would race with loadSearch("hot").
+            if (s.collection_cycle_collection_id) {
+                selectedCollectionId = s.collection_cycle_collection_id;
+            }
+        }).catch(() => {});
         await loadSearch("hot");
     });
 
@@ -84,8 +104,9 @@
         hasMore = true;
         loading = true;
         error = "";
+        searchSeed = sorting === "random" ? String(Math.floor(Math.random() * 1e9)) : null;
         try {
-            const results: Wallpaper[] = await invoke("fetch_search", { sorting, page: 1 });
+            const results: Wallpaper[] = await invoke("fetch_search", { sorting, page: 1, seed: searchSeed });
             wallpapers = results;
             hasMore = results.length >= 24;
             console.log(`[wallchemybar] loadSearch: got ${results.length} results, hasMore=${hasMore}`);
@@ -127,7 +148,10 @@
     }
 
     async function selectCollection(id: number) {
+        if (collectionCycleRunning) stopCollectionCycling();
         selectedCollectionId = id;
+        collectionCyclePage = 1; collectionCyclePageIndex = 0; collectionCycleBuffer = [];
+        saveCollectionCyclePrefs();
         await loadCollection(id);
     }
 
@@ -148,14 +172,20 @@
         hasMore = true;
         loading = true;
         error = "";
+        searchSeed = String(Math.floor(Math.random() * 1e9));
         try {
-            const results: Wallpaper[] = await invoke("fetch_search", { sorting: "relevance", page: 1, query: q });
+            const results: Wallpaper[] = await invoke("fetch_search", { sorting: "random", page: 1, query: q, seed: searchSeed });
             wallpapers = results;
             hasMore = results.length >= 24;
         } catch (e) {
             error = String(e);
         } finally {
             loading = false;
+        }
+        if (wallpapers.length > 0) {
+            await tick();
+            selectedIndex = 0;
+            searchInputEl?.blur();
         }
     }
 
@@ -169,9 +199,9 @@
         try {
             let results: Wallpaper[];
             if (activeView.kind === "search") {
-                results = await invoke("fetch_search", { sorting: activeView.sorting, page: nextPage });
+                results = await invoke("fetch_search", { sorting: activeView.sorting, page: nextPage, seed: searchSeed });
             } else if (activeView.kind === "query") {
-                results = await invoke("fetch_search", { sorting: "relevance", page: nextPage, query: activeView.query });
+                results = await invoke("fetch_search", { sorting: "random", page: nextPage, query: activeView.query, seed: searchSeed });
             } else if (activeView.kind === "collection") {
                 results = await invoke("fetch_collection_wallpapers", { collectionId: activeView.id, page: nextPage });
             } else {
@@ -217,11 +247,14 @@
     async function applyWallpaper(wp: Wallpaper) {
         invoke("hide_main");
         settingWallpaper = wp.id;
+        const start = Date.now();
         try {
             await invoke("set_wallpaper", { wallpaper: wp });
         } catch (e) {
             error = String(e);
         } finally {
+            const remaining = 600 - (Date.now() - start);
+            if (remaining > 0) await new Promise(r => setTimeout(r, remaining));
             settingWallpaper = "";
         }
     }
@@ -348,6 +381,7 @@
 
     function startCycling() {
         if (queue.length === 0) return;
+        if (collectionCycleRunning) stopCollectionCycling();
         queueRunning = true;
         queueTimerId = setInterval(advanceQueue, queueIntervalMinutes * 60 * 1000);
     }
@@ -372,6 +406,58 @@
             clearInterval(queueTimerId);
             queueTimerId = setInterval(advanceQueue, minutes * 60 * 1000);
         }
+    }
+
+    // ─── Collection cycling ───────────────────────────────────────────────────────
+    function startCollectionCycling() {
+        if (!selectedCollectionId) return;
+        if (queueRunning) stopCycling();
+        collectionCycleRunning = true;
+        collectionCyclePage = 1;
+        collectionCyclePageIndex = 0;
+        collectionCycleBuffer = [];
+        collectionCycleTimerId = setInterval(advanceCollectionCycle, collectionCycleIntervalMinutes * 60 * 1000);
+    }
+
+    function stopCollectionCycling() {
+        collectionCycleRunning = false;
+        clearInterval(collectionCycleTimerId);
+        collectionCycleTimerId = undefined;
+    }
+
+    async function advanceCollectionCycle() {
+        if (!selectedCollectionId) { stopCollectionCycling(); return; }
+        if (collectionCyclePageIndex >= collectionCycleBuffer.length) {
+            try {
+                const results: Wallpaper[] = await invoke("fetch_collection_wallpapers", {
+                    collectionId: selectedCollectionId, page: collectionCyclePage
+                });
+                if (results.length === 0) { stopCollectionCycling(); return; }
+                collectionCycleBuffer = results;
+                collectionCyclePageIndex = 0;
+                collectionCyclePage = results.length < 24 ? 1 : collectionCyclePage + 1;
+            } catch { return; }
+        }
+        await applyWallpaper(collectionCycleBuffer[collectionCyclePageIndex++]);
+    }
+
+    function changeCollectionCycleInterval(minutes: number) {
+        collectionCycleIntervalMinutes = minutes;
+        if (collectionCycleRunning) {
+            clearInterval(collectionCycleTimerId);
+            collectionCycleTimerId = setInterval(advanceCollectionCycle, minutes * 60 * 1000);
+        }
+        saveCollectionCyclePrefs();
+    }
+
+    function saveCollectionCyclePrefs() {
+        invoke("load_settings").then((s: any) => {
+            invoke("save_settings", { settings: {
+                ...s,
+                collection_cycle_collection_id: selectedCollectionId ?? 0,
+                collection_cycle_interval_minutes: collectionCycleIntervalMinutes,
+            }}).catch(() => {});
+        });
     }
 
     async function removeFromQueue(wp: Wallpaper) {
@@ -511,7 +597,7 @@
 
         <!-- Collections picker -->
         {#if activeView.kind === "collections" || activeView.kind === "collection"}
-            <div class="p-2">
+            <div class="p-2 flex flex-col gap-1.5">
                 <select
                     class="select select-sm select-bordered w-full bg-base-200 border-base-300"
                     value={selectedCollectionId ?? ""}
@@ -525,6 +611,15 @@
                         <option value={col.id}>{col.label} ({col.count})</option>
                     {/each}
                 </select>
+                {#if selectedCollectionId !== null}
+                    <CollectionCycleBar
+                        cycling={collectionCycleRunning}
+                        bind:intervalMinutes={collectionCycleIntervalMinutes}
+                        onstart={startCollectionCycling}
+                        onstop={stopCollectionCycling}
+                        onchangeinterval={changeCollectionCycleInterval}
+                    />
+                {/if}
             </div>
         {/if}
 

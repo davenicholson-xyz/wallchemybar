@@ -71,9 +71,10 @@ pub async fn fetch_search(
     sorting: String,
     page: Option<u32>,
     query: Option<String>,
+    seed: Option<String>,
 ) -> Result<Vec<Wallpaper>, String> {
     let page_num = page.unwrap_or(1);
-    info!("fetch_search: sorting={}, page={}, query={:?}", sorting, page_num, query);
+    info!("fetch_search: sorting={}, page={}, query={:?}, seed={:?}", sorting, page_num, query, seed);
 
     let settings = load_settings(app);
     let client = build_client()?;
@@ -89,6 +90,9 @@ pub async fn fetch_search(
         ("categories", categories.as_str()),
         ("page", page_str.as_str()),
     ]);
+    if let Some(s) = &seed {
+        req = req.query(&[("seed", s.as_str())]);
+    }
     if !query_str.is_empty() {
         req = req.query(&[("q", query_str.as_str())]);
     }
@@ -123,6 +127,9 @@ pub async fn fetch_search(
             ("categories", categories.as_str()),
             ("page", page_str.as_str()),
         ]);
+        if let Some(s) = &seed {
+            retry = retry.query(&[("seed", s.as_str())]);
+        }
         if !query_str.is_empty() {
             retry = retry.query(&[("q", query_str.as_str())]);
         }

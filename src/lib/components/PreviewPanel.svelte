@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { openUrl } from "@tauri-apps/plugin-opener";
     import type { Tag, Wallpaper } from "$lib/types";
 
     interface Props {
@@ -47,6 +48,14 @@
                 >
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
                     Similar
+                </button>
+                <button
+                    class="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border border-white/[0.12] bg-white/[0.04] text-base-content/55 text-xs cursor-pointer hover:bg-white/10 hover:border-white/25 transition-all duration-200"
+                    onclick={() => openUrl(`https://wallhaven.cc/w/${wallpaper!.id}`)}
+                    title="View on Wallhaven"
+                >
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                    Wallhaven
                 </button>
                 <button
                     class="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg border-0 bg-primary text-primary-content text-xs cursor-pointer shadow-[0_2px_12px_oklch(var(--p)/0.3)] hover:shadow-[0_4px_20px_oklch(var(--p)/0.5)] transition-all duration-200"
