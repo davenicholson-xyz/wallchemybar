@@ -4,9 +4,10 @@
 
     interface Props {
         onreloadsearch: (sorting: string) => void;
+        onthumbsizechange: (cols: number) => void;
     }
 
-    let { onreloadsearch }: Props = $props();
+    let { onreloadsearch, onthumbsizechange }: Props = $props();
 
     let username = $state("");
     let apiKey = $state("");
@@ -19,6 +20,9 @@
     let atleast = $state("");
     let linuxWallpaperCmd = $state("");
     let isLinux = $state(false);
+    let thumbSize = $state("medium");
+
+    const THUMB_SIZE_COLS: Record<string, number> = { small: 4, medium: 3, large: 2, xl: 1 };
 
     const ALL_RATIOS = ["16x9", "16x10", "21x9", "9x16", "4x3"] as const;
     type Ratio = typeof ALL_RATIOS[number];
@@ -45,6 +49,7 @@
                 atleast: string;
                 ratios: string;
                 linux_wallpaper_cmd: string;
+                thumb_size: string;
             } = await invoke("load_settings");
             username = settings.username;
             apiKey = settings.api_key;
@@ -57,6 +62,7 @@
             people = cats[2] === "1";
             atleast = settings.atleast ?? "";
             linuxWallpaperCmd = settings.linux_wallpaper_cmd ?? "";
+            thumbSize = settings.thumb_size ?? "medium";
             isLinux = await invoke<boolean>("is_linux");
             selectedRatios = new Set(
                 (settings.ratios ?? "").split(",").filter(r => r) as Ratio[]
@@ -81,8 +87,9 @@
         const purity = `${sfw ? "1" : "0"}${sketchy ? "1" : "0"}${nsfw ? "1" : "0"}`;
         const categories = `${general ? "1" : "0"}${anime ? "1" : "0"}${people ? "1" : "0"}`;
         await invoke("save_settings", {
-            settings: { username, api_key: apiKey, purity, categories, atleast, ratios: Array.from(selectedRatios).join(","), linux_wallpaper_cmd: linuxWallpaperCmd },
+            settings: { username, api_key: apiKey, purity, categories, atleast, ratios: Array.from(selectedRatios).join(","), linux_wallpaper_cmd: linuxWallpaperCmd, thumb_size: thumbSize },
         });
+        onthumbsizechange(THUMB_SIZE_COLS[thumbSize] ?? 3);
         onreloadsearch("hot");
         if (apiKey.trim()) {
             validateKey(apiKey);
@@ -183,6 +190,18 @@
                         <option value={res}>{res}</option>
                     {/each}
                 </select>
+            </div>
+            <div class="border-t border-base-300/50 flex items-center gap-2.5 px-3 py-2">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Thumbnails</span>
+                <div class="join flex-1">
+                    {#each [["small", "S"], ["medium", "M"], ["large", "L"], ["xl", "XL"]] as [val, label]}
+                        <button
+                            type="button"
+                            class="join-item btn btn-xs flex-1 {thumbSize === val ? 'bg-primary/20 text-primary border-primary/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}"
+                            onclick={() => (thumbSize = val)}
+                        >{label}</button>
+                    {/each}
+                </div>
             </div>
         </div>
     </div>

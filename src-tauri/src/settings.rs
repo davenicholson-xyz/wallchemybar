@@ -20,6 +20,8 @@ pub struct Settings {
     pub collection_cycle_interval_minutes: u32,
     #[serde(default)]
     pub linux_wallpaper_cmd: String,
+    #[serde(default = "default_thumb_size")]
+    pub thumb_size: String,
 }
 
 fn default_purity() -> String {
@@ -34,6 +36,10 @@ fn default_collection_cycle_interval() -> u32 {
     30
 }
 
+fn default_thumb_size() -> String {
+    "medium".to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -46,6 +52,7 @@ impl Default for Settings {
             collection_cycle_collection_id: 0,
             collection_cycle_interval_minutes: default_collection_cycle_interval(),
             linux_wallpaper_cmd: String::new(),
+            thumb_size: default_thumb_size(),
         }
     }
 }

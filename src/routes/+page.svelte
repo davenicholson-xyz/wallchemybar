@@ -49,6 +49,8 @@
     let searchSeed: string | null = null;
     let selectedIndex = $state(-1);
 
+    let thumbCols = $state(3);
+
     let isGridView = $derived(
         activeView.kind !== "settings" && activeView.kind !== "queue"
     );
@@ -92,6 +94,8 @@
             if (s.collection_cycle_collection_id) {
                 selectedCollectionId = s.collection_cycle_collection_id;
             }
+            const sizeMap: Record<string, number> = { small: 4, medium: 3, large: 2, xl: 1 };
+            thumbCols = sizeMap[s.thumb_size] ?? 3;
         }).catch(() => {});
         await loadSearch("hot");
     });
@@ -637,7 +641,7 @@
         {/if}
 
         {#if activeView.kind === "settings"}
-            <SettingsPanel onreloadsearch={loadSearch} />
+            <SettingsPanel onreloadsearch={loadSearch} onthumbsizechange={(cols) => (thumbCols = cols)} />
 
         {:else if activeView.kind === "queue"}
             <QueuePanel
@@ -666,6 +670,7 @@
                 {queue}
                 {settingWallpaper}
                 {selectedIndex}
+                cols={thumbCols}
                 onapply={applyWallpaper}
                 onopenpreview={openPreview}
                 ontogglequeue={toggleQueue}
