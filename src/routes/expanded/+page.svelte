@@ -577,7 +577,7 @@
         }
         if (selectedIndex !== prevIndex && wallpapers[selectedIndex]) {
             hoverWallpaper = null;
-            loadTagsFor(wallpapers[selectedIndex]);
+            previewTags = [];
         }
     }
 
@@ -676,9 +676,9 @@
                     {settingWallpaper}
                     {selectedIndex}
                     cols={5}
-                    onhoverwallpaper={(wp) => { hoverWallpaper = wp; }}
-                    onapply={(wp) => { selectedIndex = wallpapers.findIndex((w) => w.id === wp.id); hoverWallpaper = null; loadTagsFor(wp); }}
-                    onopenpreview={(wp) => { selectedIndex = wallpapers.findIndex((w) => w.id === wp.id); hoverWallpaper = null; loadTagsFor(wp); }}
+                    onhoverwallpaper={(wp) => { hoverWallpaper = wp; if (wp) previewTags = []; }}
+                    onapply={(wp) => { selectedIndex = wallpapers.findIndex((w) => w.id === wp.id); hoverWallpaper = null; previewTags = []; }}
+                    onopenpreview={(wp) => { selectedIndex = wallpapers.findIndex((w) => w.id === wp.id); hoverWallpaper = null; previewTags = []; }}
                     ontogglequeue={toggleQueue}
                     ondeletehistory={deleteHistoryEntry}
                 />
@@ -692,6 +692,7 @@
             onapply={applyWallpaper}
             onsearchtag={searchTag}
             onsearchsimilar={searchSimilar}
+            onloadtags={() => previewWallpaper && loadTagsFor(previewWallpaper)}
         />
 </div>
 
