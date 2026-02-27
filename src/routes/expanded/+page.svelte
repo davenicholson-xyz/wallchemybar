@@ -500,11 +500,7 @@
         const inInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
 
         if (e.key === "Escape") {
-            if (hoverWallpaper) {
-                hoverWallpaper = null;
-            } else {
-                invoke("close_expanded");
-            }
+            invoke("close_expanded");
             return;
         }
 
@@ -526,6 +522,7 @@
 
         if (!isGridView || inInput || wallpapers.length === 0) return;
 
+        const prevIndex = selectedIndex;
         switch (e.key) {
             case "ArrowRight":
                 e.preventDefault();
@@ -577,6 +574,10 @@
                     applyWallpaper(wallpapers[selectedIndex]);
                 }
                 break;
+        }
+        if (selectedIndex !== prevIndex && wallpapers[selectedIndex]) {
+            hoverWallpaper = null;
+            loadTagsFor(wallpapers[selectedIndex]);
         }
     }
 
