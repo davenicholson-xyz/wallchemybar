@@ -1,6 +1,6 @@
 use std::path::Path;
 
-pub fn set(path: &str) -> Result<(), String> {
+pub fn set(path: &str, custom_cmd: &str) -> Result<(), String> {
     let path = Path::new(path);
     if !path.exists() {
         return Err(format!("file does not exist: {}", path.display()));
@@ -17,7 +17,7 @@ pub fn set(path: &str) -> Result<(), String> {
         _ => return Err(format!("unsupported filetype: .{ext}")),
     }
 
-    platform::set_wallpaper(path.to_str().unwrap())
+    platform::set_wallpaper(path.to_str().unwrap(), custom_cmd)
 }
 
 #[cfg(target_os = "macos")]
@@ -25,7 +25,7 @@ mod platform {
     use objc::runtime::Object;
     use std::ffi::CString;
 
-    pub fn set_wallpaper(path: &str) -> Result<(), String> {
+    pub fn set_wallpaper(path: &str, _custom_cmd: &str) -> Result<(), String> {
         // Count attached screens first (fast, no alloc needed)
         let count: usize = unsafe {
             let screens: *mut Object = msg_send![class!(NSScreen), screens];
@@ -81,7 +81,23 @@ mod platform {
     use std::env;
     use std::process::Command;
 
-    pub fn set_wallpaper(path: &str) -> Result<(), String> {
+    pub fn set_wallpaper(path: &str, custom_cmd: &str) -> Result<(), String> {
+        if !custom_cmd.is_empty() {
+            let mut parts = custom_cmd.split_whitespace();
+            let prog = parts.next().ok_or("empty wallpaper command")?;
+            let output = Command::new(prog)
+                .args(parts)
+                .arg(path)
+                .output()
+                .map_err(|e| format!("failed to run wallpaper command: {e}"))?;
+            if !output.status.success() {
+                return Err(format!(
+                    "wallpaper command failed: {}",
+                    String::from_utf8_lossy(&output.stderr)
+                ));
+            }
+            return Ok(());
+        }
         let desktop = env::var("DESKTOP_SESSION").unwrap_or_default();
         let cmd = match desktop.as_str() {
             "plasma" => format!(
@@ -102,7 +118,7 @@ mod platform {
             "xfce" => format!(
                 "for prop in $(xfconf-query -c xfce4-desktop -l | grep last-image); do xfconf-query -c xfce4-desktop -p $prop -s '{path}'; done"
             ),
-            _ => return Err(format!("unsupported desktop environment: {desktop}")),
+            _ => return Err(format!("unsupported desktop environment: {desktop}. Set a wallpaper command in Settings.")),
         };
 
         let output = Command::new("sh")
@@ -140,7 +156,7 @@ mod platform {
     const SPIF_UPDATEINIFILE: u32 = 0x01;
     const SPIF_SENDCHANGE: u32 = 0x02;
 
-    pub fn set_wallpaper(path: &str) -> Result<(), String> {
+    pub fn set_wallpaper(path: &str, _custom_cmd: &str) -> Result<(), String> {
         let wide: Vec<u16> = OsStr::new(path)
             .encode_wide()
             .chain(std::iter::once(0))

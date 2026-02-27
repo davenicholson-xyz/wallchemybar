@@ -18,6 +18,8 @@ pub struct Settings {
     pub collection_cycle_collection_id: u64,
     #[serde(default = "default_collection_cycle_interval")]
     pub collection_cycle_interval_minutes: u32,
+    #[serde(default)]
+    pub linux_wallpaper_cmd: String,
 }
 
 fn default_purity() -> String {
@@ -43,6 +45,7 @@ impl Default for Settings {
             ratios: String::new(),
             collection_cycle_collection_id: 0,
             collection_cycle_interval_minutes: default_collection_cycle_interval(),
+            linux_wallpaper_cmd: String::new(),
         }
     }
 }

@@ -76,7 +76,8 @@ pub fn undo_wallpaper(app: tauri::AppHandle) -> Result<(), String> {
     if !file_path.exists() {
         return Err("Previous wallpaper not in cache".into());
     }
-    crate::setwallpaper::set(file_path.to_str().unwrap())?;
+    let settings = crate::settings::load_settings(app.clone());
+    crate::setwallpaper::set(file_path.to_str().unwrap(), &settings.linux_wallpaper_cmd)?;
     // Move the previous entry to the top of history
     let mut entries = entries;
     let entry = entries.remove(1);

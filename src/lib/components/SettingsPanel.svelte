@@ -17,6 +17,8 @@
     let anime = $state(true);
     let people = $state(true);
     let atleast = $state("");
+    let linuxWallpaperCmd = $state("");
+    let isLinux = $state(false);
 
     const ALL_RATIOS = ["16x9", "16x10", "21x9", "9x16", "4x3"] as const;
     type Ratio = typeof ALL_RATIOS[number];
@@ -42,6 +44,7 @@
                 categories: string;
                 atleast: string;
                 ratios: string;
+                linux_wallpaper_cmd: string;
             } = await invoke("load_settings");
             username = settings.username;
             apiKey = settings.api_key;
@@ -53,6 +56,8 @@
             anime = cats[1] === "1";
             people = cats[2] === "1";
             atleast = settings.atleast ?? "";
+            linuxWallpaperCmd = settings.linux_wallpaper_cmd ?? "";
+            isLinux = await invoke<boolean>("is_linux");
             selectedRatios = new Set(
                 (settings.ratios ?? "").split(",").filter(r => r) as Ratio[]
             );
@@ -76,7 +81,7 @@
         const purity = `${sfw ? "1" : "0"}${sketchy ? "1" : "0"}${nsfw ? "1" : "0"}`;
         const categories = `${general ? "1" : "0"}${anime ? "1" : "0"}${people ? "1" : "0"}`;
         await invoke("save_settings", {
-            settings: { username, api_key: apiKey, purity, categories, atleast, ratios: Array.from(selectedRatios).join(",") },
+            settings: { username, api_key: apiKey, purity, categories, atleast, ratios: Array.from(selectedRatios).join(","), linux_wallpaper_cmd: linuxWallpaperCmd },
         });
         onreloadsearch("hot");
         if (apiKey.trim()) {
@@ -181,6 +186,24 @@
             </div>
         </div>
     </div>
+
+    <!-- Linux wallpaper command -->
+    {#if isLinux}
+    <div class="flex flex-col gap-[5px]">
+        <span class="text-[9px] font-semibold text-base-content/25 uppercase tracking-[1.2px] px-[2px]">Linux</span>
+        <div class="bg-base-200 rounded-lg overflow-hidden">
+            <div class="flex items-center gap-2.5 px-3 py-2.5">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Wallpaper cmd</span>
+                <input
+                    type="text"
+                    class="flex-1 min-w-0 bg-transparent border-none outline-none text-[12px] text-base-content placeholder:text-base-content/20"
+                    bind:value={linuxWallpaperCmd}
+                    placeholder="e.g. feh --bg-fill"
+                />
+            </div>
+        </div>
+    </div>
+    {/if}
 
     <button class="btn btn-primary btn-sm w-full" onclick={save}>Save</button>
 

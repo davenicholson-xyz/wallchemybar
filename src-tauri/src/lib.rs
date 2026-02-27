@@ -20,6 +20,11 @@ use tauri::{
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 #[tauri::command]
+fn is_linux() -> bool {
+    cfg!(target_os = "linux")
+}
+
+#[tauri::command]
 fn hide_main(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.hide();
@@ -124,6 +129,7 @@ pub fn run() {
             queue::remove_from_queue,
             queue::reorder_queue,
             queue::clear_queue,
+            is_linux,
             hide_main,
             quit_app,
             open_expanded,

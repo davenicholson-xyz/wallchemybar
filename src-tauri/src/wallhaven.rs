@@ -261,7 +261,8 @@ pub async fn set_wallpaper(app: tauri::AppHandle, wallpaper: Wallpaper) -> Resul
         })?;
     }
 
-    crate::setwallpaper::set(file_path.to_str().unwrap())?;
+    let settings = crate::settings::load_settings(app.clone());
+    crate::setwallpaper::set(file_path.to_str().unwrap(), &settings.linux_wallpaper_cmd)?;
     crate::history::add_to_history(&app, &wallpaper)?;
 
     info!("set_wallpaper: applied successfully");
