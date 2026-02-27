@@ -49,6 +49,48 @@ fn close_expanded(app: tauri::AppHandle) {
     }
 }
 
+fn handle_cli_args(app: &tauri::AppHandle, argv: &[String]) {
+    let action = argv.iter().skip(1)
+        .find_map(|a| match a.trim_start_matches('-') {
+            "show" | "s"     => Some("show"),
+            "toggle" | "t"   => Some("toggle"),
+            "expanded" | "e" => Some("expanded"),
+            "hide" | "h"     => Some("hide"),
+            _                => None,
+        })
+        .unwrap_or("toggle"); // no args → toggle
+
+    log::info!("cli action: {}", action);
+    match action {
+        "expanded" => {
+            if let Some(w) = app.get_webview_window("main") { let _ = w.hide(); }
+            if let Some(w) = app.get_webview_window("expanded") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+        "hide" => {
+            if let Some(w) = app.get_webview_window("main") { let _ = w.hide(); }
+        }
+        "toggle" => {
+            if let Some(w) = app.get_webview_window("main") {
+                if w.is_visible().unwrap_or(false) {
+                    let _ = w.hide();
+                } else {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+        }
+        _ => { // "show"
+            if let Some(w) = app.get_webview_window("main") {
+                let _ = w.show();
+                let _ = w.set_focus();
+            }
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
@@ -60,6 +102,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            log::info!("second instance argv: {:?}", argv);
+            handle_cli_args(app, &argv);
+        }))
         .invoke_handler(tauri::generate_handler![
             settings::load_settings,
             settings::save_settings,
@@ -90,6 +136,13 @@ pub fn run() {
                 let ns_app: *mut objc::runtime::Object =
                     msg_send![class!(NSApplication), sharedApplication];
                 let _: () = msg_send![ns_app, setActivationPolicy: 1i64]; // NSApplicationActivationPolicyAccessory
+            }
+
+            // If launched with CLI args (e.g. from i3 keybinding when app wasn't running),
+            // act on them now that windows exist.
+            let launch_args: Vec<String> = std::env::args().collect();
+            if launch_args.len() > 1 {
+                handle_cli_args(app.handle(), &launch_args);
             }
 
             // Cmd+Shift+W — toggle window from anywhere
