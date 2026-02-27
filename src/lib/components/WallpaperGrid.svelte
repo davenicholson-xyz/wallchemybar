@@ -81,18 +81,18 @@
                     {/if}
                 </button>
 
-                <!-- Wallhaven link icon (top-right, second from right) -->
+                <!-- Wallhaven link icon (bottom-right, second from right) -->
                 <button
-                    class="absolute top-1.5 right-9 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-white/85 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-white/20 hover:text-white transition-all duration-200"
+                    class="absolute bottom-1.5 right-9 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-white/85 opacity-30 hover:opacity-100 hover:bg-white/20 hover:text-white transition-all duration-200"
                     onclick={(e) => { e.stopPropagation(); openUrl(`https://wallhaven.cc/w/${wp.id}`); }}
                     title="View on Wallhaven"
                 >
                     <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
                 </button>
 
-                <!-- Preview icon (top-right) -->
+                <!-- Preview icon (bottom-right) -->
                 <button
-                    class="absolute top-1.5 right-1.5 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-white/85 opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-primary/60 hover:text-white transition-all duration-200"
+                    class="absolute bottom-1.5 right-1.5 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-white/85 opacity-30 hover:opacity-100 hover:bg-primary/60 hover:text-white transition-all duration-200"
                     onclick={() => onopenpreview(wp)}
                     title="Preview"
                 >
@@ -113,10 +113,10 @@
                     {/if}
                 </button>
 
-                <!-- Delete icon (history view only, top-left) -->
+                <!-- Delete icon (history view only, bottom-left beside queue) -->
                 {#if activeView.kind === "history"}
                     <button
-                        class="absolute top-1.5 left-1.5 w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-error opacity-0 -translate-y-1 group-hover:opacity-100 group-hover:translate-y-0 hover:bg-error/70 hover:text-white transition-all duration-200"
+                        class="absolute bottom-1.5 left-[38px] w-[26px] h-[26px] flex items-center justify-center rounded-lg p-0 cursor-pointer border-0 bg-black/50 backdrop-blur-[8px] text-error opacity-30 hover:opacity-100 hover:bg-error/70 hover:text-white transition-all duration-200"
                         onclick={(e) => { e.stopPropagation(); ondeletehistory(wp); }}
                         title="Remove from history"
                     >
@@ -151,19 +151,16 @@
     }
 
     .queue-icon {
-        opacity: 0;
-        transform: translateY(4px);
+        opacity: 0.3;
+    }
+
+    .queue-icon:hover {
+        opacity: 1;
     }
 
     .queue-icon.in-queue {
         background: rgba(60, 170, 100, 0.7);
         color: #fff;
         opacity: 1;
-        transform: translateY(0);
-    }
-
-    .thumb-wrapper:hover .queue-icon {
-        opacity: 1;
-        transform: translateY(0);
     }
 </style>
