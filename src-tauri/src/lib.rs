@@ -19,6 +19,7 @@ use tauri::{
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
+#[cfg(not(target_os = "windows"))]
 fn modifier_from_str(s: &str) -> Modifiers {
     match s {
         "ctrl" => Modifiers::CONTROL,
@@ -29,42 +30,47 @@ fn modifier_from_str(s: &str) -> Modifiers {
 
 #[tauri::command]
 fn reregister_shortcuts(app: tauri::AppHandle, modifier: String) -> Result<(), String> {
-    let mod_key = modifier_from_str(&modifier);
-    let shortcuts = app.global_shortcut();
-    for key in [Code::KeyW, Code::KeyE] {
-        for m in [Modifiers::META, Modifiers::CONTROL, Modifiers::ALT] {
-            let _ = shortcuts.unregister(Shortcut::new(Some(m | Modifiers::SHIFT), key));
-        }
-    }
-    let toggle = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyW);
-    shortcuts.on_shortcut(toggle, |app, _shortcut, event| {
-        if event.state() == ShortcutState::Pressed {
-            if let Some(window) = app.get_webview_window("main") {
-                if window.is_visible().unwrap_or(false) {
-                    let _ = window.hide();
-                } else {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let mod_key = modifier_from_str(&modifier);
+        let shortcuts = app.global_shortcut();
+        for key in [Code::KeyW, Code::KeyE] {
+            for m in [Modifiers::META, Modifiers::CONTROL, Modifiers::ALT] {
+                let _ = shortcuts.unregister(Shortcut::new(Some(m | Modifiers::SHIFT), key));
             }
         }
-    }).map_err(|e| e.to_string())?;
-    let expand = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyE);
-    shortcuts.on_shortcut(expand, |app, _shortcut, event| {
-        if event.state() == ShortcutState::Pressed {
-            if let Some(expanded) = app.get_webview_window("expanded") {
-                if expanded.is_visible().unwrap_or(false) {
-                    let _ = expanded.hide();
-                } else {
-                    if let Some(main) = app.get_webview_window("main") {
-                        let _ = main.hide();
+        let toggle = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyW);
+        shortcuts.on_shortcut(toggle, |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                if let Some(window) = app.get_webview_window("main") {
+                    if window.is_visible().unwrap_or(false) {
+                        let _ = window.hide();
+                    } else {
+                        let _ = window.show();
+                        let _ = window.set_focus();
                     }
-                    let _ = expanded.show();
-                    let _ = expanded.set_focus();
                 }
             }
-        }
-    }).map_err(|e| e.to_string())?;
+        }).map_err(|e| e.to_string())?;
+        let expand = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyE);
+        shortcuts.on_shortcut(expand, |app, _shortcut, event| {
+            if event.state() == ShortcutState::Pressed {
+                if let Some(expanded) = app.get_webview_window("expanded") {
+                    if expanded.is_visible().unwrap_or(false) {
+                        let _ = expanded.hide();
+                    } else {
+                        if let Some(main) = app.get_webview_window("main") {
+                            let _ = main.hide();
+                        }
+                        let _ = expanded.show();
+                        let _ = expanded.set_focus();
+                    }
+                }
+            }
+        }).map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "windows")]
+    let _ = (app, modifier);
     Ok(())
 }
 
@@ -201,42 +207,46 @@ pub fn run() {
                 handle_cli_args(app.handle(), &launch_args);
             }
 
-            // Load the configured modifier key (default: Meta/Cmd)
-            let startup_settings = settings::load_settings(app.handle().clone());
-            let mod_key = modifier_from_str(&startup_settings.hotkey_modifier);
+            // Global shortcuts — skipped on Windows (OS blocks third-party modifier combos)
+            #[cfg(not(target_os = "windows"))]
+            {
+                // Load the configured modifier key (default: Meta/Cmd)
+                let startup_settings = settings::load_settings(app.handle().clone());
+                let mod_key = modifier_from_str(&startup_settings.hotkey_modifier);
 
-            // [modifier]+Shift+W — toggle window from anywhere
-            let toggle = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyW);
-            app.handle().global_shortcut().on_shortcut(toggle, |app, _shortcut, event| {
-                if event.state() == ShortcutState::Pressed {
-                    if let Some(window) = app.get_webview_window("main") {
-                        if window.is_visible().unwrap_or(false) {
-                            let _ = window.hide();
-                        } else {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                }
-            })?;
-
-            // [modifier]+Shift+E — open/focus expanded window from anywhere
-            let expand = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyE);
-            app.handle().global_shortcut().on_shortcut(expand, |app, _shortcut, event| {
-                if event.state() == ShortcutState::Pressed {
-                    if let Some(expanded) = app.get_webview_window("expanded") {
-                        if expanded.is_visible().unwrap_or(false) {
-                            let _ = expanded.hide();
-                        } else {
-                            if let Some(main) = app.get_webview_window("main") {
-                                let _ = main.hide();
+                // [modifier]+Shift+W — toggle window from anywhere
+                let toggle = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyW);
+                app.handle().global_shortcut().on_shortcut(toggle, |app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        if let Some(window) = app.get_webview_window("main") {
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.set_focus();
                             }
-                            let _ = expanded.show();
-                            let _ = expanded.set_focus();
                         }
                     }
-                }
-            })?;
+                })?;
+
+                // [modifier]+Shift+E — open/focus expanded window from anywhere
+                let expand = Shortcut::new(Some(mod_key | Modifiers::SHIFT), Code::KeyE);
+                app.handle().global_shortcut().on_shortcut(expand, |app, _shortcut, event| {
+                    if event.state() == ShortcutState::Pressed {
+                        if let Some(expanded) = app.get_webview_window("expanded") {
+                            if expanded.is_visible().unwrap_or(false) {
+                                let _ = expanded.hide();
+                            } else {
+                                if let Some(main) = app.get_webview_window("main") {
+                                    let _ = main.hide();
+                                }
+                                let _ = expanded.show();
+                                let _ = expanded.set_focus();
+                            }
+                        }
+                    }
+                })?;
+            }
 
             let icon = app
                 .default_window_icon()
