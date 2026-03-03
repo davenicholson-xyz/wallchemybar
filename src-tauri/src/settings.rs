@@ -22,6 +22,8 @@ pub struct Settings {
     pub linux_wallpaper_cmd: String,
     #[serde(default = "default_thumb_size")]
     pub thumb_size: String,
+    #[serde(default = "default_hotkey_modifier")]
+    pub hotkey_modifier: String,
 }
 
 fn default_purity() -> String {
@@ -40,6 +42,10 @@ fn default_thumb_size() -> String {
     "medium".to_string()
 }
 
+fn default_hotkey_modifier() -> String {
+    "meta".to_string()
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
@@ -53,6 +59,7 @@ impl Default for Settings {
             collection_cycle_interval_minutes: default_collection_cycle_interval(),
             linux_wallpaper_cmd: String::new(),
             thumb_size: default_thumb_size(),
+            hotkey_modifier: default_hotkey_modifier(),
         }
     }
 }

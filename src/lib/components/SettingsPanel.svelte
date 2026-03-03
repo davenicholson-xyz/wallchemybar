@@ -21,6 +21,7 @@
     let linuxWallpaperCmd = $state("");
     let isLinux = $state(false);
     let thumbSize = $state("medium");
+    let hotkeyModifier = $state("meta");
 
     const THUMB_SIZE_COLS: Record<string, number> = { small: 4, medium: 3, large: 2, xl: 1 };
 
@@ -50,6 +51,7 @@
                 ratios: string;
                 linux_wallpaper_cmd: string;
                 thumb_size: string;
+                hotkey_modifier: string;
             } = await invoke("load_settings");
             username = settings.username;
             apiKey = settings.api_key;
@@ -63,6 +65,7 @@
             atleast = settings.atleast ?? "";
             linuxWallpaperCmd = settings.linux_wallpaper_cmd ?? "";
             thumbSize = settings.thumb_size ?? "medium";
+            hotkeyModifier = settings.hotkey_modifier ?? "meta";
             isLinux = await invoke<boolean>("is_linux");
             selectedRatios = new Set(
                 (settings.ratios ?? "").split(",").filter(r => r) as Ratio[]
@@ -87,8 +90,9 @@
         const purity = `${sfw ? "1" : "0"}${sketchy ? "1" : "0"}${nsfw ? "1" : "0"}`;
         const categories = `${general ? "1" : "0"}${anime ? "1" : "0"}${people ? "1" : "0"}`;
         await invoke("save_settings", {
-            settings: { username, api_key: apiKey, purity, categories, atleast, ratios: Array.from(selectedRatios).join(","), linux_wallpaper_cmd: linuxWallpaperCmd, thumb_size: thumbSize },
+            settings: { username, api_key: apiKey, purity, categories, atleast, ratios: Array.from(selectedRatios).join(","), linux_wallpaper_cmd: linuxWallpaperCmd, thumb_size: thumbSize, hotkey_modifier: hotkeyModifier },
         });
+        await invoke("reregister_shortcuts", { modifier: hotkeyModifier });
         onthumbsizechange(THUMB_SIZE_COLS[thumbSize] ?? 3);
         onreloadsearch("hot");
         if (apiKey.trim()) {
@@ -202,6 +206,29 @@
                         >{label}</button>
                     {/each}
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global shortcuts -->
+    <div class="flex flex-col gap-[5px]">
+        <span class="text-[9px] font-semibold text-base-content/25 uppercase tracking-[1.2px] px-[2px]">Global Shortcuts</span>
+        <div class="bg-base-200 rounded-lg overflow-hidden">
+            <div class="flex items-center gap-2.5 px-3 py-2">
+                <span class="text-[11px] text-base-content/40 w-[62px] shrink-0">Modifier</span>
+                <div class="join flex-1">
+                    {#each [["meta", "Meta/Win"], ["ctrl", "Ctrl"], ["alt", "Alt"]] as [val, label]}
+                        <button
+                            type="button"
+                            class="join-item btn btn-xs flex-1 {hotkeyModifier === val ? 'bg-primary/20 text-primary border-primary/30' : 'bg-base-300/60 text-base-content/30 border-transparent'}"
+                            onclick={() => (hotkeyModifier = val)}
+                        >{label}</button>
+                    {/each}
+                </div>
+            </div>
+            <div class="border-t border-base-300/50 px-3 py-2 flex flex-col gap-0.5">
+                <span class="text-[10px] text-base-content/30">Toggle: <span class="text-base-content/50">{hotkeyModifier === "meta" ? "Meta/Win" : hotkeyModifier === "ctrl" ? "Ctrl" : "Alt"} + Shift + W</span></span>
+                <span class="text-[10px] text-base-content/30">Expand: <span class="text-base-content/50">{hotkeyModifier === "meta" ? "Meta/Win" : hotkeyModifier === "ctrl" ? "Ctrl" : "Alt"} + Shift + E</span></span>
             </div>
         </div>
     </div>
